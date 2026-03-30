@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using OpenTK.Core.Utility;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
@@ -8,6 +9,22 @@ public static class Window {
   public static WindowHandle handle = null!;
   public static OpenGLContextHandle context = null!;
   public static Vector2i size;
+
+  private static readonly HashSet<Key> keysDown = new();
+
+  public static bool IsKeyDown(Key key) => keysDown.Contains(key);
+
+  public static bool CameraResetRequested { get; set; }
+
+  public static Camera Camera { get; private set; } = null!;
+
+  private static Vector2 lastMouse = Vector2.Zero;
+  private static bool mouseLookInitialized;
+
+  public static void ResetMouseLook() {
+    lastMouse = Vector2.Zero;
+    mouseLookInitialized = false;
+  }
 
   public static void Init(int width, int height, string title) {
     size = new Vector2i(width, height);
@@ -28,8 +45,16 @@ public static class Window {
     Console.WriteLine($"MonitorInfo: {monitorInfo.CurrentVideoMode.Width}, {monitorInfo.CurrentVideoMode.Height}");
 
     Toolkit.Window.SetMode(handle, WindowMode.Normal);
+    Toolkit.Window.SetBorderStyle(handle, WindowBorderStyle.FixedBorder);
     Toolkit.Window.SetClientSize(handle, new Vector2i(800, 600));
     GL.Viewport(0, 0, 800, 600);
+
+    Toolkit.Window.GetClientSize(handle, out Vector2i clientSize);
+    float aspect = clientSize.Y > 0 ? (float)clientSize.X / clientSize.Y : 1.33f;
+    Camera = new Camera(aspect);
+
+    Toolkit.Window.SetCursorCaptureMode(handle, CursorCaptureMode.Locked);
+    Toolkit.Window.SetCursor(handle, null);
 
     EventQueue.EventRaised += HandleEvents;
 
@@ -56,10 +81,30 @@ public static class Window {
         break;
 
       case KeyDownEventArgs keydownEvent:
-        // Console.WriteLine($"Keydown event: {keydownEvent}");
+        keysDown.Add(keydownEvent.Key);
         if (keydownEvent.Key == Key.Escape) {
           Toolkit.Window.Destroy(Window.handle);
         }
+        break;
+
+      case KeyUpEventArgs keyUpEvent:
+        keysDown.Remove(keyUpEvent.Key);
+        break;
+
+      case MouseButtonDownEventArgs mouseDown:
+        if (mouseDown.Button == MouseButton.Button2)
+          CameraResetRequested = true;
+        break;
+
+      case MouseMoveEventArgs mouseMove:
+        if (!mouseLookInitialized) {
+          lastMouse = mouseMove.ClientPosition;
+          mouseLookInitialized = true;
+          break;
+        }
+        Vector2 diff = mouseMove.ClientPosition - lastMouse;
+        Camera.Look(diff / 1000f);
+        lastMouse = mouseMove.ClientPosition;
         break;
 
       default:

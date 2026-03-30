@@ -1,11 +1,10 @@
 #version 330
 
-in vec3 color;
-out vec4 fragColor;
+in vec2 uvcoord;
 
+uniform sampler2D tex;
 uniform bool drawLineFlag;
 
-void main ()
-{
-    fragColor = vec4(drawLineFlag ? vec3(1.0) : color, 1.0);
-}
+out vec4 fragColor;
+
+void main() { fragColor = drawLineFlag ? vec4(1.0) : texture(tex, uvcoord); }
