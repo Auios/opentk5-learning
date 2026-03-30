@@ -8,6 +8,8 @@ using OpenTK.Windowing.Desktop;
 using Vector3 = OpenTK.Mathematics.Vector3;
 
 public static class Program {
+  private static bool drawLines = true;
+
   public static void Main(string[] args) {
     Window.Init(800, 600, "Uptime");
     Debug.Init();
@@ -52,6 +54,7 @@ public static class Program {
     GL.VertexAttribPointer(position, 3, VertexAttribPointerType.Float, false, sizeof(float) * 3, 0);
     int uTransformation = GL.GetUniformLocation(shader.id, "transform");
     int uProjection = GL.GetUniformLocation(shader.id, "projection");
+    int udrawLineFlag = GL.GetUniformLocation(shader.id, "drawLineFlag");
 
     // Matrix4 projection = Matrix4.CreateOrthographic(2.66f, 2f, 0.01f, 100f);
     Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView(
@@ -74,7 +77,18 @@ public static class Program {
         GL.UniformMatrix4f(uTransformation, 1, true, ref transform);
         angle += 0.01f;
         angle = MathHelper.ClampRadians(angle);
+        GL.Uniform1i(udrawLineFlag, 0);
         GL.DrawArrays(PrimitiveType.Triangles, 0, verticies.Length);
+        if (drawLines) {
+          GL.Uniform1i(udrawLineFlag, 1);
+          GL.Enable(EnableCap.PolygonOffsetLine);
+          GL.PolygonOffset(-1f, -1f);
+          GL.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
+          GL.DrawArrays(PrimitiveType.Triangles, 0, verticies.Length);
+          GL.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
+          GL.Disable(EnableCap.PolygonOffsetLine);
+          GL.Uniform1i(udrawLineFlag, 0);
+        }
         Window.SwapBuffers();
       }
 
