@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using OpenTK.Core.Utility;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
@@ -10,16 +9,17 @@ public static class Window {
   public static OpenGLContextHandle context = null!;
   public static Vector2i size;
 
-  private static readonly HashSet<Key> keysDown = new();
-
-  public static bool IsKeyDown(Key key) => keysDown.Contains(key);
-
   public static bool CameraResetRequested { get; set; }
 
   public static Camera Camera { get; private set; } = null!;
 
   private static Vector2 lastMouse = Vector2.Zero;
   private static bool mouseLookInitialized;
+
+  private static CursorHandle defaultCursor = null!;
+  private static bool grabbed;
+
+  public static Vector3 Move = Vector3.Zero;
 
   public static void ResetMouseLook() {
     lastMouse = Vector2.Zero;
@@ -53,12 +53,10 @@ public static class Window {
     float aspect = clientSize.Y > 0 ? (float)clientSize.X / clientSize.Y : 1.33f;
     Camera = new Camera(aspect);
 
-    Toolkit.Window.SetCursorCaptureMode(handle, CursorCaptureMode.Locked);
-    Toolkit.Window.SetCursor(handle, null);
+    defaultCursor = Toolkit.Cursor.Create(SystemCursorType.Default);
 
     EventQueue.EventRaised += HandleEvents;
 
-    // Center the window on the screen
     Window.SetPosition(Monitor.GetCenter() - Window.GetSize() / 2);
   }
 
@@ -74,21 +72,65 @@ public static class Window {
     Toolkit.OpenGL.SwapBuffers(context);
   }
 
-  public static void HandleEvents(PalHandle? handle, PlatformEventType type, EventArgs args) {
+  public static void ReleaseMouseLook() {
+    grabbed = false;
+    Toolkit.Window.SetCursorCaptureMode(handle, CursorCaptureMode.Normal);
+    Toolkit.Window.SetCursor(handle, defaultCursor);
+    ResetMouseLook();
+  }
+
+  public static void HandleEvents(PalHandle? palHandle, PlatformEventType type, EventArgs args) {
     switch (args) {
-      case CloseEventArgs closeEvent:
+      case CloseEventArgs:
         Toolkit.Window.Destroy(Window.handle);
         break;
 
-      case KeyDownEventArgs keydownEvent:
-        keysDown.Add(keydownEvent.Key);
-        if (keydownEvent.Key == Key.Escape) {
-          Toolkit.Window.Destroy(Window.handle);
+      case KeyDownEventArgs keyDown:
+        if (keyDown.IsRepeat)
+          break;
+        switch (keyDown.Scancode) {
+          case Scancode.LeftAlt:
+            Toolkit.Window.SetCursorCaptureMode(handle, CursorCaptureMode.Locked);
+            Toolkit.Window.SetCursor(handle, null);
+            grabbed = true;
+            break;
+          case Scancode.W:
+            Move.Z -= 1f;
+            break;
+          case Scancode.S:
+            Move.Z += 1f;
+            break;
+          case Scancode.A:
+            Move.X -= 1f;
+            break;
+          case Scancode.D:
+            Move.X += 1f;
+            break;
         }
+        if (keyDown.Key == Key.Escape)
+          Toolkit.Window.Destroy(Window.handle);
         break;
 
-      case KeyUpEventArgs keyUpEvent:
-        keysDown.Remove(keyUpEvent.Key);
+      case KeyUpEventArgs keyUp:
+        switch (keyUp.Scancode) {
+          case Scancode.LeftAlt:
+            Toolkit.Window.SetCursorCaptureMode(handle, CursorCaptureMode.Normal);
+            Toolkit.Window.SetCursor(handle, defaultCursor);
+            grabbed = false;
+            break;
+          case Scancode.W:
+            Move.Z += 1f;
+            break;
+          case Scancode.S:
+            Move.Z -= 1f;
+            break;
+          case Scancode.A:
+            Move.X += 1f;
+            break;
+          case Scancode.D:
+            Move.X -= 1f;
+            break;
+        }
         break;
 
       case MouseButtonDownEventArgs mouseDown:
@@ -103,12 +145,12 @@ public static class Window {
           break;
         }
         Vector2 diff = mouseMove.ClientPosition - lastMouse;
-        Camera.Look(diff / 1000f);
+        if (grabbed)
+          Camera.Look(diff / 1000f);
         lastMouse = mouseMove.ClientPosition;
         break;
 
       default:
-        // Console.WriteLine($"Unknown event type: {type}");
         break;
     }
   }
