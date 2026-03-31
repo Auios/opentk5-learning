@@ -1,5 +1,3 @@
-using System.Numerics;
-using System.Runtime.InteropServices;
 using OpenTK.Core.Utility;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
@@ -20,7 +18,7 @@ public static class Program {
     GL.ClearColor(0.2f, 0.3f, 0.4f, 1.0f);
     GL.Enable(EnableCap.DepthTest);
     GL.Enable(EnableCap.PolygonOffsetLine);
-    GL.PolygonOffset(-1f, -1f);
+    GL.PolygonOffset(-1, 0);
 
     Vector3[] verticies = [
       (-0.5f, -0.5f, -0.5f), (0.5f, -0.5f, -0.5f),(0.5f,  0.5f, -0.5f),
@@ -95,7 +93,6 @@ public static class Program {
     int uTex = GL.GetUniformLocation(shader.id, "tex");
 
     Camera cam = Window.Camera;
-    const float moveSpeed = 0.05f;
 
     while (true) {
       Toolkit.Window.ProcessEvents(false);
@@ -105,27 +102,13 @@ public static class Program {
         cam.Position = new Vector3(0f, 0.5f, 1.5f);
         cam.Pitch = -0.3f;
         cam.Yaw = 0f;
-        Window.ResetMouseLook();
+        Window.Move = Vector3.Zero;
+        Window.ReleaseMouseLook();
+        cam.Update();
         Window.CameraResetRequested = false;
       }
 
-      float forward = 0f;
-      if (Window.IsKeyDown(Key.W) || Window.IsKeyDown(Key.UpArrow))
-        forward += 1f;
-      if (Window.IsKeyDown(Key.S) || Window.IsKeyDown(Key.DownArrow))
-        forward -= 1f;
-      float strafe = 0f;
-      if (Window.IsKeyDown(Key.D) || Window.IsKeyDown(Key.RightArrow))
-        strafe += 1f;
-      if (Window.IsKeyDown(Key.A) || Window.IsKeyDown(Key.LeftArrow))
-        strafe -= 1f;
-      if (forward != 0f || strafe != 0f) {
-        Vector3 f = new Vector3(MathF.Sin(cam.Yaw), 0f, -MathF.Cos(cam.Yaw));
-        Vector3 r = new Vector3(MathF.Cos(cam.Yaw), 0f, MathF.Sin(cam.Yaw));
-        cam.Position += (f * forward + r * strafe) * moveSpeed;
-      }
-
-      cam.Update();
+      cam.Move(Window.Move);
 
       // Draw
       {
