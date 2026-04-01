@@ -1,3 +1,4 @@
+using ImGuiNET;
 using OpenTK.Core.Utility;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
@@ -8,15 +9,21 @@ using Vector3 = OpenTK.Mathematics.Vector3;
 
 public static class Program {
   private static bool drawLines = true;
+  private static bool showImGuiDemoWindow;
 
   public static void Main(string[] args) {
     Window.Init(800, 600, "Uptime");
     Debug.Init();
 
+    ImGuiApp.Init();
+
     Shader shader = new Shader("vert.glsl", "frag.glsl");
 
     GL.ClearColor(0.2f, 0.3f, 0.4f, 1.0f);
     GL.Enable(EnableCap.DepthTest);
+    GL.Enable(EnableCap.CullFace);
+    GL.CullFace(TriangleFace.Back);
+    GL.FrontFace(FrontFaceDirection.Ccw);
     GL.Enable(EnableCap.PolygonOffsetLine);
     GL.PolygonOffset(-1, 0);
 
@@ -64,8 +71,6 @@ public static class Program {
       data[d + 4] = uvCoords[i].Y;
     }
 
-    // GL.Enable(EnableCap.CullFace);
-
     int vao = GL.GenVertexArray();
     GL.BindVertexArray(vao);
 
@@ -91,6 +96,9 @@ public static class Program {
     int uProjection = GL.GetUniformLocation(shader.id, "projection");
     int udrawLineFlag = GL.GetUniformLocation(shader.id, "drawLineFlag");
     int uTex = GL.GetUniformLocation(shader.id, "tex");
+    int uObjectId = GL.GetUniformLocation(shader.id, "objectId");
+    int uHoveredObject = GL.GetUniformLocation(shader.id, "hoveredObject");
+    int uHoverEnabled = GL.GetUniformLocation(shader.id, "hoverEnabled");
 
     Camera cam = Window.Camera;
 
@@ -105,31 +113,83 @@ public static class Program {
 
       cam.Move(Window.Move);
 
+      Toolkit.Window.GetClientSize(Window.handle, out Vector2i clientPx);
+      int vw = clientPx.X > 0 ? clientPx.X : 800;
+      int vh = clientPx.Y > 0 ? clientPx.Y : 600;
+      GL.Viewport(0, 0, vw, vh);
+
+      ImGuiApp.NewFrame(vw, vh);
+
       // Draw
       {
         GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-        Matrix4 rotation = Matrix4.CreateRotationX(-2.2f) * Matrix4.CreateRotationY(0.7f);
+        Matrix4 orient = Matrix4.CreateRotationX(-2.2f) * Matrix4.CreateRotationY(0.7f);
+        Matrix4 cube0Model = orient * Matrix4.CreateTranslation(-1.25f, 0f, 0f);
+        Matrix4 cube1Model = orient * Matrix4.CreateTranslation(1.25f, 0f, 0f);
+        Matrix4[] cubeModels = [cube0Model, cube1Model];
+
         Matrix4 proj = cam.Projection;
         Matrix4 view = cam.View;
-        GL.UniformMatrix4f(uRotation, 1, true, ref rotation);
+
+        int hoveredObject = -1;
+        if (!Window.Grabbed)
+          hoveredObject = CubeHoverPick.PickObject(
+            Window.ClientPointer, vw, vh, cam.Position, view, proj, cubeModels);
+
         GL.UniformMatrix4f(uView, 1, true, ref view);
         GL.UniformMatrix4f(uProjection, 1, true, ref proj);
+        GL.Uniform1i(uHoveredObject, hoveredObject);
+        GL.Uniform1i(uHoverEnabled, Window.Grabbed ? 0 : 1);
         GL.ActiveTexture(TextureUnit.Texture0);
         GL.BindTexture(TextureTarget.Texture2d, brick.handle);
         GL.Uniform1i(uTex, 0);
         GL.Uniform1i(udrawLineFlag, 0);
-        GL.DrawArrays(PrimitiveType.Triangles, 0, verticies.Length);
+
+        for (int i = 0; i < cubeModels.Length; i++) {
+          Matrix4 model = cubeModels[i];
+          GL.UniformMatrix4f(uRotation, 1, true, ref model);
+          GL.Uniform1i(uObjectId, i);
+          GL.DrawArrays(PrimitiveType.Triangles, 0, verticies.Length);
+        }
+
         if (drawLines) {
           GL.Uniform1i(udrawLineFlag, 1);
+          GL.Uniform1i(uHoverEnabled, 0);
           GL.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Line);
-          GL.DrawArrays(PrimitiveType.Triangles, 0, verticies.Length);
+          for (int i = 0; i < cubeModels.Length; i++) {
+            Matrix4 model = cubeModels[i];
+            GL.UniformMatrix4f(uRotation, 1, true, ref model);
+            GL.Uniform1i(uObjectId, i);
+            GL.DrawArrays(PrimitiveType.Triangles, 0, verticies.Length);
+          }
           GL.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
           GL.Uniform1i(udrawLineFlag, 0);
         }
+
+        float yawDeg = cam.Yaw * (180f / MathF.PI);
+        float pitchDeg = cam.Pitch * (180f / MathF.PI);
+        ImGui.SetNextWindowPos(new System.Numerics.Vector2(8f, 8f), ImGuiCond.Always, new System.Numerics.Vector2(0f, 0f));
+        ImGui.SetNextWindowBgAlpha(0.72f);
+        ImGui.Begin("Camera",
+          ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoNav | ImGuiWindowFlags.NoMove
+          | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoSavedSettings);
+        ImGui.Text($"Position: ({cam.Position.X:F2}, {cam.Position.Y:F2}, {cam.Position.Z:F2})");
+        ImGui.Text($"Rotation: yaw {yawDeg:F1} deg, pitch {pitchDeg:F1} deg");
+        ImGui.End();
+
+        if (ImGui.IsKeyPressed(ImGuiKey.E))
+          showImGuiDemoWindow = !showImGuiDemoWindow;
+        if (showImGuiDemoWindow)
+          ImGui.ShowDemoWindow(ref showImGuiDemoWindow);
+
+        ImGuiApp.RenderDrawData();
+
         Window.SwapBuffers();
       }
 
       Thread.Sleep(1);
     }
+
+    ImGuiApp.Shutdown();
   }
 }

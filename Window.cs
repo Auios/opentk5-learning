@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ImGuiNET;
 using OpenTK.Core.Utility;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
@@ -20,9 +21,23 @@ public static class Window {
   private static CursorHandle defaultCursor = null!;
   private static bool grabbed;
 
+  /// <summary>True while cursor is locked (mouselook); false in Alt "mouse mode".</summary>
+  public static bool Grabbed => grabbed;
+
+  /// <summary>Latest pointer position in client coordinates (updated every <see cref="MouseMoveEventArgs"/>).</summary>
+  public static Vector2 ClientPointer { get; private set; }
+
   public static Vector3 Move = Vector3.Zero;
 
   private static readonly HashSet<Scancode> movementKeysHeld = new();
+
+  /// <summary>Key events for ImGui (<see cref="ImGuiIOPtr.AddKeyEvent"/>), drained each frame by <see cref="ImGuiApp.NewFrame"/>.</summary>
+  public static readonly List<(ImGuiKey key, bool down)> ImGuiKeyEvents = new();
+
+  public static bool MouseLeft;
+  public static bool MouseRight;
+  public static bool MouseMiddle;
+  public static Vector2 ScrollAccum = Vector2.Zero;
 
   /// <summary>
   /// Rebuilds <see cref="Move"/> from keys currently held. Using accumulation + KeyUp deltas gets out of sync
@@ -80,6 +95,8 @@ public static class Window {
     Window.SetPosition(Monitor.GetCenter() - Window.GetSize() / 2);
 
     GrabMouseLook();
+
+    ClientPointer = new Vector2(size.X * 0.5f, size.Y * 0.5f);
   }
 
   public static void SetPosition(Vector2i position) {
@@ -117,6 +134,10 @@ public static class Window {
         break;
 
       case KeyDownEventArgs keyDown:
+        ImGuiKey? imguiKeyDown = KeyMap.ToImGuiKey(keyDown.Key);
+        if (imguiKeyDown.HasValue && !keyDown.IsRepeat)
+          ImGuiKeyEvents.Add((imguiKeyDown.Value, true));
+
         if (keyDown.IsRepeat)
           break;
         switch (keyDown.Scancode) {
@@ -136,6 +157,10 @@ public static class Window {
         break;
 
       case KeyUpEventArgs keyUp:
+        ImGuiKey? imguiKeyUp = KeyMap.ToImGuiKey(keyUp.Key);
+        if (imguiKeyUp.HasValue)
+          ImGuiKeyEvents.Add((imguiKeyUp.Value, false));
+
         switch (keyUp.Scancode) {
           case Scancode.LeftAlt:
             GrabMouseLook();
@@ -151,11 +176,40 @@ public static class Window {
         break;
 
       case MouseButtonDownEventArgs mouseDown:
-        if (mouseDown.Button == MouseButton.Button2)
-          CameraResetRequested = true;
+        switch (mouseDown.Button) {
+          case MouseButton.Button1:
+            MouseLeft = true;
+            break;
+          case MouseButton.Button2:
+            MouseMiddle = true;
+            CameraResetRequested = true;
+            break;
+          case MouseButton.Button3:
+            MouseRight = true;
+            break;
+        }
+        break;
+
+      case MouseButtonUpEventArgs mouseUp:
+        switch (mouseUp.Button) {
+          case MouseButton.Button1:
+            MouseLeft = false;
+            break;
+          case MouseButton.Button2:
+            MouseMiddle = false;
+            break;
+          case MouseButton.Button3:
+            MouseRight = false;
+            break;
+        }
+        break;
+
+      case ScrollEventArgs scroll:
+        ScrollAccum += scroll.Delta;
         break;
 
       case MouseMoveEventArgs mouseMove:
+        ClientPointer = mouseMove.ClientPosition;
         if (!mouseLookInitialized) {
           lastMouse = mouseMove.ClientPosition;
           mouseLookInitialized = true;
