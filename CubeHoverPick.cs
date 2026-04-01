@@ -2,9 +2,9 @@ using OpenTK.Mathematics;
 
 /// <summary>Ray vs cube meshes for object hover.</summary>
 public static class CubeHoverPick {
-  const float Epsilon = 1e-5f;
+  private const float Epsilon = 1e-5f;
 
-  static readonly Vector3[] CubeVertices = [
+  private static readonly Vector3[] CubeVertices = [
     (-0.5f, -0.5f, -0.5f), (0.5f, -0.5f, -0.5f), (0.5f, 0.5f, -0.5f),
     (0.5f, 0.5f, -0.5f), (-0.5f, 0.5f, -0.5f), (-0.5f, -0.5f, -0.5f),
     (-0.5f, -0.5f, 0.5f), (0.5f, -0.5f, 0.5f), (0.5f, 0.5f, 0.5f),
@@ -50,7 +50,7 @@ public static class CubeHoverPick {
     return bestObj;
   }
 
-  static Vector3 ScreenToWorldRay(Vector2 mouseTopLeft, int w, int h, Matrix4 view, Matrix4 projection) {
+  private static Vector3 ScreenToWorldRay(Vector2 mouseTopLeft, int w, int h, Matrix4 view, Matrix4 projection) {
     float mx = mouseTopLeft.X;
     float my = h - mouseTopLeft.Y;
     Matrix4 invVp = (view * projection).Inverted();
@@ -59,7 +59,7 @@ public static class CubeHoverPick {
     return Vector3.Normalize(far - near);
   }
 
-  static bool RayTriangle(Vector3 orig, Vector3 dir, Vector3 v0, Vector3 v1, Vector3 v2, out float t) {
+  private static bool RayTriangle(Vector3 orig, Vector3 dir, Vector3 v0, Vector3 v1, Vector3 v2, out float t) {
     Vector3 e1 = v1 - v0;
     Vector3 e2 = v2 - v0;
     Vector3 h = Vector3.Cross(dir, e2);

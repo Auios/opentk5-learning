@@ -8,15 +8,15 @@ public class Shader {
   public Shader(string vertexShaderFilename, string fragmentShaderFilename) {
     string shaderDir = Path.Combine(AppContext.BaseDirectory, "shaders");
 
-    vertexShaderSource = File.ReadAllText(Path.Combine(shaderDir, vertexShaderFilename));
-    fragmentShaderSource = File.ReadAllText(Path.Combine(shaderDir, fragmentShaderFilename));
+    this.vertexShaderSource = File.ReadAllText(Path.Combine(shaderDir, vertexShaderFilename));
+    this.fragmentShaderSource = File.ReadAllText(Path.Combine(shaderDir, fragmentShaderFilename));
 
     int vertexHandle = GL.CreateShader(ShaderType.VertexShader);
-    GL.ShaderSource(vertexHandle, vertexShaderSource);
+    GL.ShaderSource(vertexHandle, this.vertexShaderSource);
     CompileShader(vertexHandle);
 
     int fragmentHandle = GL.CreateShader(ShaderType.FragmentShader);
-    GL.ShaderSource(fragmentHandle, fragmentShaderSource);
+    GL.ShaderSource(fragmentHandle, this.fragmentShaderSource);
     CompileShader(fragmentHandle);
 
     int shaderHandle = GL.CreateProgram();
@@ -29,7 +29,7 @@ public class Shader {
     GL.DeleteShader(vertexHandle);
     GL.DeleteShader(fragmentHandle);
 
-    id = shaderHandle;
+    this.id = shaderHandle;
     UseProgram(shaderHandle);
   }
 

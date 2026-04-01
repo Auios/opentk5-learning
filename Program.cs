@@ -1,9 +1,9 @@
 using ImGuiNET;
-using OpenTK.Core.Utility;
+
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using OpenTK.Platform;
-using OpenTK.Windowing.Desktop;
+
 using Vector2 = OpenTK.Mathematics.Vector2;
 using Vector3 = OpenTK.Mathematics.Vector3;
 
@@ -86,10 +86,11 @@ public static class Program {
     GL.EnableVertexAttribArray(uv);
     GL.VertexAttribPointer(uv, 2, VertexAttribPointerType.Float, false, sizeof(float) * 5, sizeof(float) * 3);
 
-    string brickPath = Path.Combine(AppContext.BaseDirectory, "assets", "red_brick_diff_1k.png");
-    Texture brick = new Texture();
-    using (FileStream brickTextureStream = File.OpenRead(brickPath))
-      brick.Buffer(brickTextureStream);
+    string brickTexturePath = Path.Combine(AppContext.BaseDirectory, "assets", "textures/red_brick_diff_1k.png");
+    Texture brickTexture = new Texture(brickTexturePath);
+    string spawnSoundPath = Path.Combine(AppContext.BaseDirectory, "assets", "sounds", "spawn.wav");
+    using Sound spawnSound = new Sound(spawnSoundPath);
+    spawnSound.Play();
 
     int uRotation = GL.GetUniformLocation(shader.id, "rotation");
     int uView = GL.GetUniformLocation(shader.id, "view");
@@ -108,6 +109,7 @@ public static class Program {
 
       if (Window.CameraResetRequested) {
         cam.ResetToDefaultView();
+        spawnSound.Play();
         Window.CameraResetRequested = false;
       }
 
@@ -141,7 +143,7 @@ public static class Program {
         GL.Uniform1i(uHoveredObject, hoveredObject);
         GL.Uniform1i(uHoverEnabled, Window.Grabbed ? 0 : 1);
         GL.ActiveTexture(TextureUnit.Texture0);
-        GL.BindTexture(TextureTarget.Texture2d, brick.handle);
+        GL.BindTexture(TextureTarget.Texture2d, brickTexture.handle);
         GL.Uniform1i(uTex, 0);
         GL.Uniform1i(udrawLineFlag, 0);
 

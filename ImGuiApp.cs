@@ -4,8 +4,8 @@ using ImGuiNET;
 using Opentk5Learning.ImGuiBackends;
 
 public static class ImGuiApp {
-  static readonly Stopwatch frameClock = Stopwatch.StartNew();
-  static double lastTimeSeconds;
+  private static readonly Stopwatch frameClock = Stopwatch.StartNew();
+  private static double lastTimeSeconds;
 
   public static void Init() {
     ImGui.CreateContext();

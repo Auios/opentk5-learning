@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+
 using OpenTK.Graphics.OpenGL;
 
 public static class Debug {

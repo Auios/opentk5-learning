@@ -94,7 +94,7 @@ public static class Window {
 
     EventQueue.EventRaised += HandleEvents;
 
-    Window.SetPosition(Monitor.GetCenter() - Window.GetSize() / 2);
+    Window.SetPosition(Monitor.GetCenter() - (Window.GetSize() / 2));
 
     GrabMouseLook();
 
@@ -129,7 +129,7 @@ public static class Window {
     ResetMouseLook();
   }
 
-  public static void HandleEvents(PalHandle? palHandle, PlatformEventType type, EventArgs args) {
+  public static void HandleEvents(PalHandle palHandle, PlatformEventType type, EventArgs args) {
     switch (args) {
       case CloseEventArgs:
         Toolkit.Window.Destroy(Window.handle);
@@ -145,6 +145,9 @@ public static class Window {
         switch (keyDown.Scancode) {
           case Scancode.LeftAlt:
             ReleaseMouseLook();
+            break;
+          case Scancode.R:
+            CameraResetRequested = true;
             break;
           case Scancode.W:
           case Scancode.S:
@@ -184,10 +187,10 @@ public static class Window {
             break;
           case MouseButton.Button2:
             MouseMiddle = true;
-            CameraResetRequested = true;
             break;
           case MouseButton.Button3:
             MouseRight = true;
+            CameraResetRequested = true;
             break;
         }
         break;

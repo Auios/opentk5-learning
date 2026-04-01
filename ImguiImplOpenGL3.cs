@@ -9,329 +9,306 @@ using System.Runtime.InteropServices;
 namespace Opentk5Learning.ImGuiBackends;
 
 public unsafe static class ImguiImplOpenGL3 {
-        struct RendererData {
-            public int FontTexture;
-            public int ShaderHandle;
-            public int UniformLocationTex;
-            public int UniformLocationProjMtx;
-            public int AttribLocationVtxPos;
-            public int AttribLocationVtxUV;
-            public int AttribLocationVtxColor;
-            public int VboHandle;
-            public int EboHandle;
+  private struct RendererData {
+    public int FontTexture;
+    public int ShaderHandle;
+    public int UniformLocationTex;
+    public int UniformLocationProjMtx;
+    public int AttribLocationVtxPos;
+    public int AttribLocationVtxUV;
+    public int AttribLocationVtxColor;
+    public int VboHandle;
+    public int EboHandle;
 
-            public int GlslVersion;
-            public bool KHRDebugAvailable;
-        }
+    public int GlslVersion;
+    public bool KHRDebugAvailable;
+  }
 
-        static RendererData* GetBackendData()
-        {
-            return ImGui.GetCurrentContext() == IntPtr.Zero ? null : (RendererData*)ImGui.GetIO().BackendRendererUserData;
-        }
+  private static RendererData* GetBackendData() {
+    return ImGui.GetCurrentContext() == IntPtr.Zero ? null : (RendererData*)ImGui.GetIO().BackendRendererUserData;
+  }
 
-        public static bool Init(bool useKHRDebugIfAvailable = true)
-        {
-            var io = ImGui.GetIO();
+  public static bool Init(bool useKHRDebugIfAvailable = true) {
+    var io = ImGui.GetIO();
 
-            RendererData* bd = (RendererData*)NativeMemory.AllocZeroed((uint)sizeof(RendererData));
+    RendererData* bd = (RendererData*)NativeMemory.AllocZeroed((uint)sizeof(RendererData));
 
-            int major = GL.GetInteger(GetPName.MajorVersion);
-            int minor = GL.GetInteger(GetPName.MinorVersion);
+    int major = GL.GetInteger(GetPName.MajorVersion);
+    int minor = GL.GetInteger(GetPName.MinorVersion);
 
-            bd->GlslVersion = (major, minor) switch
-            {
-                (4, 6) => 460,
-                (4, 5) => 450,
-                (4, 4) => 440,
-                (4, 3) => 430,
-                (4, 2) => 420,
-                (4, 1) => 410,
-                (4, 0) => 400,
-                (3, 3) => 330,
-                (3, 2) => 150,
-                (3, 1) => 140,
-                (3, 0) => 130,
-                (2, 1) => 120,
-                (2, 0) => 110,
-                _ => 110,
-            };
+    bd->GlslVersion = (major, minor) switch {
+      (4, 6) => 460,
+      (4, 5) => 450,
+      (4, 4) => 440,
+      (4, 3) => 430,
+      (4, 2) => 420,
+      (4, 1) => 410,
+      (4, 0) => 400,
+      (3, 3) => 330,
+      (3, 2) => 150,
+      (3, 1) => 140,
+      (3, 0) => 130,
+      (2, 1) => 120,
+      (2, 0) => 110,
+      _ => 110,
+    };
 
-            bd->KHRDebugAvailable = useKHRDebugIfAvailable && (major > 4 || (major == 4 && minor >= 3));
+    bd->KHRDebugAvailable = useKHRDebugIfAvailable && (major > 4 || (major == 4 && minor >= 3));
 
-            io.BackendRendererUserData = (IntPtr)bd;
-            io.NativePtr->BackendRendererName = (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference("opentk_impl_opengl3"u8));
+    io.BackendRendererUserData = (IntPtr)bd;
+    io.NativePtr->BackendRendererName = (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference("opentk_impl_opengl3"u8));
 
-            io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset;
+    io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset;
 
-            return true;
-        }
+    return true;
+  }
 
-        public static void Shutdown()
-        {
-            var io = ImGui.GetIO();
+  public static void Shutdown() {
+    var io = ImGui.GetIO();
 
-            RendererData* bd = (RendererData*)io.NativePtr->BackendRendererUserData;
+    RendererData* bd = (RendererData*)io.NativePtr->BackendRendererUserData;
 
-            io.NativePtr->BackendRendererName = null;
-            io.NativePtr->BackendRendererUserData = null;
+    io.NativePtr->BackendRendererName = null;
+    io.NativePtr->BackendRendererUserData = null;
 
-            io.BackendFlags &= ~(ImGuiBackendFlags.RendererHasVtxOffset);
+    io.BackendFlags &= ~ImGuiBackendFlags.RendererHasVtxOffset;
 
-            NativeMemory.Free(bd);
-        }
+    NativeMemory.Free(bd);
+  }
 
-        public static void NewFrame()
-        {
-            RendererData* bd = GetBackendData();
+  public static void NewFrame() {
+    RendererData* bd = GetBackendData();
 
-            if (bd->ShaderHandle == 0)
-            {
-                CreateDeviceObjects();
-            }
-            if (bd->FontTexture == 0)
-            {
-                CreateFontsTexture();
-            }
-        }
+    if (bd->ShaderHandle == 0) {
+      CreateDeviceObjects();
+    }
+    if (bd->FontTexture == 0) {
+      CreateFontsTexture();
+    }
+  }
 
-        public static void SetupRenderState(ImDrawDataPtr drawData, int fbWidth, int fbHeight, int vao)
-        {
-            RendererData* bd = GetBackendData();
+  public static void SetupRenderState(ImDrawDataPtr drawData, int fbWidth, int fbHeight, int vao) {
+    RendererData* bd = GetBackendData();
 
-            GL.Enable(EnableCap.Blend);
-            GL.BlendEquation(BlendEquationMode.FuncAdd);
-            GL.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
-            GL.Disable(EnableCap.CullFace);
-            GL.Disable(EnableCap.DepthTest);
-            GL.Disable(EnableCap.StencilTest);
-            GL.Enable(EnableCap.ScissorTest);
-            // FIXME: check for 3.1
-            GL.Disable(EnableCap.PrimitiveRestart);
+    GL.Enable(EnableCap.Blend);
+    GL.BlendEquation(BlendEquationMode.FuncAdd);
+    GL.BlendFuncSeparate(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha, BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
+    GL.Disable(EnableCap.CullFace);
+    GL.Disable(EnableCap.DepthTest);
+    GL.Disable(EnableCap.StencilTest);
+    GL.Enable(EnableCap.ScissorTest);
+    // FIXME: check for 3.1
+    GL.Disable(EnableCap.PrimitiveRestart);
 
-            GL.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
+    GL.PolygonMode(TriangleFace.FrontAndBack, PolygonMode.Fill);
 
-            bool clip_origin_lower_left = true;
-            // Desktop GL defaults to lower-left; skip CLIP_ORIGIN query (OpenTK 5 pname differs by profile).
+    bool clip_origin_lower_left = true;
+    // Desktop GL defaults to lower-left; skip CLIP_ORIGIN query (OpenTK 5 pname differs by profile).
 
-            GL.Viewport(0, 0, fbWidth, fbHeight);
-            float L = drawData.DisplayPos.X;
-            float R = drawData.DisplayPos.X + drawData.DisplaySize.X;
-            float T = drawData.DisplayPos.Y;
-            float B = drawData.DisplayPos.Y + drawData.DisplaySize.Y;
-            if (clip_origin_lower_left == false)
-                (T, B) = (B, T); // Swap top and bottom if origin is upper left.
-            Matrix4 mvp = Matrix4.CreateOrthographicOffCenter(L, R, B, T, -1, 1);
-            GL.UseProgram(bd->ShaderHandle);
-            GL.Uniform1i(bd->UniformLocationTex, 0);
-            GL.UniformMatrix4f(bd->UniformLocationProjMtx, 1, true, ref mvp);
+    GL.Viewport(0, 0, fbWidth, fbHeight);
+    float L = drawData.DisplayPos.X;
+    float R = drawData.DisplayPos.X + drawData.DisplaySize.X;
+    float T = drawData.DisplayPos.Y;
+    float B = drawData.DisplayPos.Y + drawData.DisplaySize.Y;
+    if (clip_origin_lower_left == false)
+      (T, B) = (B, T); // Swap top and bottom if origin is upper left.
+    Matrix4 mvp = Matrix4.CreateOrthographicOffCenter(L, R, B, T, -1, 1);
+    GL.UseProgram(bd->ShaderHandle);
+    GL.Uniform1i(bd->UniformLocationTex, 0);
+    GL.UniformMatrix4f(bd->UniformLocationProjMtx, 1, true, ref mvp);
 
-            GL.BindSampler(0, 0);
+    GL.BindSampler(0, 0);
 
-            GL.BindVertexArray(vao);
-            GL.BindBuffer(BufferTarget.ArrayBuffer, bd->VboHandle);
-            GL.BindBuffer(BufferTarget.ElementArrayBuffer, bd->EboHandle);
-            GL.EnableVertexAttribArray((uint)bd->AttribLocationVtxPos);
-            GL.EnableVertexAttribArray((uint)bd->AttribLocationVtxUV);
-            GL.EnableVertexAttribArray((uint)bd->AttribLocationVtxColor);
-            GL.VertexAttribPointer((uint)bd->AttribLocationVtxPos, 2, VertexAttribPointerType.Float, false, sizeof(ImDrawVert), (void*)0);
-            GL.VertexAttribPointer((uint)bd->AttribLocationVtxUV, 2, VertexAttribPointerType.Float, false, sizeof(ImDrawVert), (void*)8);
-            GL.VertexAttribPointer((uint)bd->AttribLocationVtxColor, 4, VertexAttribPointerType.UnsignedByte, true, sizeof(ImDrawVert), (void*)16);
+    GL.BindVertexArray(vao);
+    GL.BindBuffer(BufferTarget.ArrayBuffer, bd->VboHandle);
+    GL.BindBuffer(BufferTarget.ElementArrayBuffer, bd->EboHandle);
+    GL.EnableVertexAttribArray((uint)bd->AttribLocationVtxPos);
+    GL.EnableVertexAttribArray((uint)bd->AttribLocationVtxUV);
+    GL.EnableVertexAttribArray((uint)bd->AttribLocationVtxColor);
+    GL.VertexAttribPointer((uint)bd->AttribLocationVtxPos, 2, VertexAttribPointerType.Float, false, sizeof(ImDrawVert), (void*)0);
+    GL.VertexAttribPointer((uint)bd->AttribLocationVtxUV, 2, VertexAttribPointerType.Float, false, sizeof(ImDrawVert), (void*)8);
+    GL.VertexAttribPointer((uint)bd->AttribLocationVtxColor, 4, VertexAttribPointerType.UnsignedByte, true, sizeof(ImDrawVert), (void*)16);
 
-            if (bd->KHRDebugAvailable)
-                GL.ObjectLabel(ObjectIdentifier.VertexArray, (uint)vao, -1, "OpenTK_ImGui: VAO");
-        }
+    if (bd->KHRDebugAvailable)
+      GL.ObjectLabel(ObjectIdentifier.VertexArray, (uint)vao, -1, "OpenTK_ImGui: VAO");
+  }
 
-        public static void RenderDrawData(ImDrawDataPtr drawData)
-        {
-            int fbWidth = (int)(drawData.DisplaySize.X * drawData.FramebufferScale.X);
-            int fbHeight = (int)(drawData.DisplaySize.Y * drawData.FramebufferScale.Y);
-            if (fbWidth <= 0 || fbHeight <= 0)
-                return;
+  public static void RenderDrawData(ImDrawDataPtr drawData) {
+    int fbWidth = (int)(drawData.DisplaySize.X * drawData.FramebufferScale.X);
+    int fbHeight = (int)(drawData.DisplaySize.Y * drawData.FramebufferScale.Y);
+    if (fbWidth <= 0 || fbHeight <= 0)
+      return;
 
-            int last_active_texture = GL.GetInteger(GetPName.ActiveTexture);
-            GL.ActiveTexture(TextureUnit.Texture0);
-            int last_program = GL.GetInteger(GetPName.CurrentProgram);
-            int last_texture = GL.GetInteger(GetPName.TextureBinding2d);
-            int last_sampler = GL.GetInteger(GetPName.SamplerBinding);
-            int last_array_buffer = GL.GetInteger(GetPName.ArrayBufferBinding);
-            int last_vao = GL.GetInteger(GetPName.VertexArrayBinding);
-            // OpenGL 3.0 & 3.1 have separate polygon modes for front and back.
-            Span<int> last_polygon_mode = stackalloc int[2];
-            GL.GetInteger(GetPName.PolygonMode, out last_polygon_mode[0]);
-            Span<int> last_viewport = stackalloc int[4];
-            GL.GetInteger(GetPName.Viewport, out last_viewport[0]);
-            Span<int> last_scissor_box = stackalloc int[4];
-            GL.GetInteger(GetPName.ScissorBox, out last_scissor_box[0]);
-            int last_blend_src_rgb = GL.GetInteger(GetPName.BlendSrcRgb);
-            int last_blend_dst_rgb = GL.GetInteger(GetPName.BlendDstRgb);
-            int last_blend_src_alpha = GL.GetInteger(GetPName.BlendSrcAlpha);
-            int last_blend_dst_alpha = GL.GetInteger(GetPName.BlendDstAlpha);
-            int last_blend_equation_rgb = GL.GetInteger(GetPName.BlendEquationRgb);
-            int last_blend_equation_alpha = GL.GetInteger(GetPName.BlendEquationAlpha);
-            bool last_enable_blend = GL.IsEnabled(EnableCap.Blend);
-            bool last_enable_cull_face = GL.IsEnabled(EnableCap.CullFace);
-            bool last_enable_depth_test = GL.IsEnabled(EnableCap.DepthTest);
-            bool last_enable_stencil_test = GL.IsEnabled(EnableCap.StencilTest);
-            bool last_enable_scissor_test = GL.IsEnabled(EnableCap.ScissorTest);
-            // FIXME: Check for >= 3.1
-            bool last_enable_primitive_restart = GL.IsEnabled(EnableCap.PrimitiveRestart);
+    int last_active_texture = GL.GetInteger(GetPName.ActiveTexture);
+    GL.ActiveTexture(TextureUnit.Texture0);
+    int last_program = GL.GetInteger(GetPName.CurrentProgram);
+    int last_texture = GL.GetInteger(GetPName.TextureBinding2d);
+    int last_sampler = GL.GetInteger(GetPName.SamplerBinding);
+    int last_array_buffer = GL.GetInteger(GetPName.ArrayBufferBinding);
+    int last_vao = GL.GetInteger(GetPName.VertexArrayBinding);
+    // OpenGL 3.0 & 3.1 have separate polygon modes for front and back.
+    Span<int> last_polygon_mode = stackalloc int[2];
+    GL.GetInteger(GetPName.PolygonMode, out last_polygon_mode[0]);
+    Span<int> last_viewport = stackalloc int[4];
+    GL.GetInteger(GetPName.Viewport, out last_viewport[0]);
+    Span<int> last_scissor_box = stackalloc int[4];
+    GL.GetInteger(GetPName.ScissorBox, out last_scissor_box[0]);
+    int last_blend_src_rgb = GL.GetInteger(GetPName.BlendSrcRgb);
+    int last_blend_dst_rgb = GL.GetInteger(GetPName.BlendDstRgb);
+    int last_blend_src_alpha = GL.GetInteger(GetPName.BlendSrcAlpha);
+    int last_blend_dst_alpha = GL.GetInteger(GetPName.BlendDstAlpha);
+    int last_blend_equation_rgb = GL.GetInteger(GetPName.BlendEquationRgb);
+    int last_blend_equation_alpha = GL.GetInteger(GetPName.BlendEquationAlpha);
+    bool last_enable_blend = GL.IsEnabled(EnableCap.Blend);
+    bool last_enable_cull_face = GL.IsEnabled(EnableCap.CullFace);
+    bool last_enable_depth_test = GL.IsEnabled(EnableCap.DepthTest);
+    bool last_enable_stencil_test = GL.IsEnabled(EnableCap.StencilTest);
+    bool last_enable_scissor_test = GL.IsEnabled(EnableCap.ScissorTest);
+    // FIXME: Check for >= 3.1
+    bool last_enable_primitive_restart = GL.IsEnabled(EnableCap.PrimitiveRestart);
 
-            int vao = GL.GenVertexArray();
+    int vao = GL.GenVertexArray();
+    SetupRenderState(drawData, fbWidth, fbHeight, vao);
+
+    var clipOff = drawData.DisplayPos;
+    var clipScale = drawData.FramebufferScale;
+    for (int n = 0; n < drawData.CmdListsCount; n++) {
+      ImDrawListPtr drawList = drawData.CmdLists[n];
+
+      nint vtx_buffer_size = drawList.VtxBuffer.Size * (int)sizeof(ImDrawVert);
+      nint idx_buffer_size = drawList.IdxBuffer.Size * (int)sizeof(ushort);
+      GL.BufferData(BufferTarget.ArrayBuffer, vtx_buffer_size, drawList.VtxBuffer.Data, BufferUsage.StreamDraw);
+      GL.BufferData(BufferTarget.ElementArrayBuffer, idx_buffer_size, drawList.IdxBuffer.Data, BufferUsage.StreamDraw);
+
+      for (int cmd_i = 0; cmd_i < drawList.CmdBuffer.Size; cmd_i++) {
+        ImDrawCmdPtr cmd = drawList.CmdBuffer[cmd_i];
+        if (cmd.UserCallback != IntPtr.Zero) {
+          nint resetCb = unchecked((nint)(-8));
+          if (cmd.UserCallback == resetCb)
             SetupRenderState(drawData, fbWidth, fbHeight, vao);
+          else
+            throw new NotImplementedException("User callbacks are not implemented yet...");
+        } else {
+          System.Numerics.Vector4 cr = cmd.ClipRect;
+          OpenTK.Mathematics.Vector2 clip_min = new((cr.X - clipOff.X) * clipScale.X, (cr.Y - clipOff.Y) * clipScale.Y);
+          OpenTK.Mathematics.Vector2 clip_max = new((cr.Z - clipOff.X) * clipScale.X, (cr.W - clipOff.Y) * clipScale.Y);
+          if (clip_max.X <= clip_min.X || clip_max.Y <= clip_min.Y)
+            continue;
 
-            var clipOff = drawData.DisplayPos;
-            var clipScale = drawData.FramebufferScale;
-            for (int n = 0; n < drawData.CmdListsCount; n++)
-            {
-                ImDrawListPtr drawList = drawData.CmdLists[n];
+          GL.Scissor((int)clip_min.X, (int)((float)fbHeight - clip_max.Y), (int)(clip_max.X - clip_min.X), (int)(clip_max.Y - clip_min.Y));
 
-                nint vtx_buffer_size = drawList.VtxBuffer.Size * (int)sizeof(ImDrawVert);
-                nint idx_buffer_size = drawList.IdxBuffer.Size * (int)sizeof(ushort);
-                GL.BufferData(BufferTarget.ArrayBuffer, vtx_buffer_size, drawList.VtxBuffer.Data, BufferUsage.StreamDraw);
-                GL.BufferData(BufferTarget.ElementArrayBuffer, idx_buffer_size, drawList.IdxBuffer.Data, BufferUsage.StreamDraw);
+          GL.BindTexture(TextureTarget.Texture2d, (int)cmd.GetTexID());
 
-                for (int cmd_i = 0; cmd_i < drawList.CmdBuffer.Size; cmd_i++)
-                {
-                    ImDrawCmdPtr cmd = drawList.CmdBuffer[cmd_i];
-                    if (cmd.UserCallback != IntPtr.Zero)
-                    {
-                        nint resetCb = unchecked((nint)(-8));
-                        if (cmd.UserCallback == resetCb)
-                            SetupRenderState(drawData, fbWidth, fbHeight, vao);
-                        else
-                            throw new NotImplementedException("User callbacks are not implemented yet...");
-                    }
-                    else
-                    {
-                        System.Numerics.Vector4 cr = cmd.ClipRect;
-                        OpenTK.Mathematics.Vector2 clip_min = new((cr.X - clipOff.X) * clipScale.X, (cr.Y - clipOff.Y) * clipScale.Y);
-                        OpenTK.Mathematics.Vector2 clip_max = new((cr.Z - clipOff.X) * clipScale.X, (cr.W - clipOff.Y) * clipScale.Y);
-                        if (clip_max.X <= clip_min.X || clip_max.Y <= clip_min.Y)
-                            continue;
-
-                        GL.Scissor((int)clip_min.X, (int)((float)fbHeight - clip_max.Y), (int)(clip_max.X - clip_min.X), (int)(clip_max.Y - clip_min.Y));
-
-                        GL.BindTexture(TextureTarget.Texture2d, (int)cmd.GetTexID());
-
-                        GL.DrawElementsBaseVertex(PrimitiveType.Triangles, (int)cmd.ElemCount, DrawElementsType.UnsignedShort, (void*)(cmd.IdxOffset * sizeof(ushort)), (int)cmd.VtxOffset);
-                    }
-                }
-            }
-
-            GL.DeleteVertexArray(vao);
-
-            if (last_program == 0 || GL.IsProgram(last_program)) GL.UseProgram(last_program);
-            GL.BindTexture(TextureTarget.Texture2d, last_texture);
-            GL.BindSampler(0, last_sampler);
-            GL.ActiveTexture((TextureUnit)last_active_texture);
-            GL.BindVertexArray(last_vao);
-            GL.BindBuffer(BufferTarget.ArrayBuffer, last_array_buffer);
-            GL.BlendEquationSeparate((BlendEquationMode)last_blend_equation_rgb, (BlendEquationMode)last_blend_equation_alpha);
-            GL.BlendFuncSeparate((BlendingFactor)last_blend_src_rgb, (BlendingFactor)last_blend_dst_rgb, (BlendingFactor)last_blend_src_alpha, (BlendingFactor)last_blend_dst_alpha);
-            if (last_enable_blend) GL.Enable(EnableCap.Blend); else GL.Disable(EnableCap.Blend);
-            if (last_enable_cull_face) GL.Enable(EnableCap.CullFace); else GL.Disable(EnableCap.CullFace);
-            if (last_enable_depth_test) GL.Enable(EnableCap.DepthTest); else GL.Disable(EnableCap.DepthTest);
-            if (last_enable_stencil_test) GL.Enable(EnableCap.StencilTest); else GL.Disable(EnableCap.StencilTest);
-            if (last_enable_scissor_test) GL.Enable(EnableCap.ScissorTest); else GL.Disable(EnableCap.ScissorTest);
-            if (last_enable_primitive_restart) GL.Enable(EnableCap.PrimitiveRestart); else GL.Disable(EnableCap.PrimitiveRestart);
-
-            if (true)
-            {
-                // FIXME:
-                // if (bd->HasPolygonMode) {
-                //     if (bd->GlVersion <= 310 || bd->GlProfileIsCompat) {
-                //          glPolygonMode(GL_FRONT, (GLenum)last_polygon_mode[0]);
-                //          glPolygonMode(GL_BACK, (GLenum)last_polygon_mode[1]);
-                //     } else {
-                //          glPolygonMode(GL_FRONT_AND_BACK, (GLenum)last_polygon_mode[0]);
-                //     }
-                // }
-                GL.PolygonMode(TriangleFace.FrontAndBack, (PolygonMode)last_polygon_mode[0]);
-            }
-
-            GL.Viewport(last_viewport[0], last_viewport[1], last_viewport[2], last_viewport[3]);
-            GL.Scissor(last_scissor_box[0], last_scissor_box[1], last_scissor_box[2], last_scissor_box[3]);
+          GL.DrawElementsBaseVertex(PrimitiveType.Triangles, (int)cmd.ElemCount, DrawElementsType.UnsignedShort, (void*)(cmd.IdxOffset * sizeof(ushort)), (int)cmd.VtxOffset);
         }
+      }
+    }
 
-        static void CreateFontsTexture()
-        {
-            var io = ImGui.GetIO();
-            RendererData* bd = GetBackendData();
+    GL.DeleteVertexArray(vao);
 
-            ImGuiNative.ImFontAtlas_AddFontDefault(io.Fonts.NativePtr, null);
-            //io.Fonts.AddFontDefault();
-            io.Fonts.GetTexDataAsRGBA32(out byte* pixels, out int width, out int height);
+    if (last_program == 0 || GL.IsProgram(last_program)) GL.UseProgram(last_program);
+    GL.BindTexture(TextureTarget.Texture2d, last_texture);
+    GL.BindSampler(0, last_sampler);
+    GL.ActiveTexture((TextureUnit)last_active_texture);
+    GL.BindVertexArray(last_vao);
+    GL.BindBuffer(BufferTarget.ArrayBuffer, last_array_buffer);
+    GL.BlendEquationSeparate((BlendEquationMode)last_blend_equation_rgb, (BlendEquationMode)last_blend_equation_alpha);
+    GL.BlendFuncSeparate((BlendingFactor)last_blend_src_rgb, (BlendingFactor)last_blend_dst_rgb, (BlendingFactor)last_blend_src_alpha, (BlendingFactor)last_blend_dst_alpha);
+    if (last_enable_blend) GL.Enable(EnableCap.Blend); else GL.Disable(EnableCap.Blend);
+    if (last_enable_cull_face) GL.Enable(EnableCap.CullFace); else GL.Disable(EnableCap.CullFace);
+    if (last_enable_depth_test) GL.Enable(EnableCap.DepthTest); else GL.Disable(EnableCap.DepthTest);
+    if (last_enable_stencil_test) GL.Enable(EnableCap.StencilTest); else GL.Disable(EnableCap.StencilTest);
+    if (last_enable_scissor_test) GL.Enable(EnableCap.ScissorTest); else GL.Disable(EnableCap.ScissorTest);
+    if (last_enable_primitive_restart) GL.Enable(EnableCap.PrimitiveRestart); else GL.Disable(EnableCap.PrimitiveRestart);
 
-            int last_texture = GL.GetInteger(GetPName.TextureBinding2d);
-            bd->FontTexture = GL.GenTexture();
-            GL.BindTexture(TextureTarget.Texture2d, bd->FontTexture);
-            GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-            GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-            GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
-            GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
-            GL.PixelStorei(PixelStoreParameter.UnpackRowLength, 0);
-            GL.TexImage2D(TextureTarget.Texture2d, 0, InternalFormat.Rgba, width, height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)pixels);
+    if (true) {
+      // FIXME:
+      // if (bd->HasPolygonMode) {
+      //     if (bd->GlVersion <= 310 || bd->GlProfileIsCompat) {
+      //          glPolygonMode(GL_FRONT, (GLenum)last_polygon_mode[0]);
+      //          glPolygonMode(GL_BACK, (GLenum)last_polygon_mode[1]);
+      //     } else {
+      //          glPolygonMode(GL_FRONT_AND_BACK, (GLenum)last_polygon_mode[0]);
+      //     }
+      // }
+      GL.PolygonMode(TriangleFace.FrontAndBack, (PolygonMode)last_polygon_mode[0]);
+    }
 
-            io.Fonts.SetTexID(bd->FontTexture);
+    GL.Viewport(last_viewport[0], last_viewport[1], last_viewport[2], last_viewport[3]);
+    GL.Scissor(last_scissor_box[0], last_scissor_box[1], last_scissor_box[2], last_scissor_box[3]);
+  }
 
-            GL.BindTexture(TextureTarget.Texture2d, last_texture);
+  private static void CreateFontsTexture() {
+    var io = ImGui.GetIO();
+    RendererData* bd = GetBackendData();
 
-            if (bd->KHRDebugAvailable)
-                GL.ObjectLabel(ObjectIdentifier.Texture, (uint)bd->FontTexture, -1, "OpenTK_ImGui: Font Texture");
-        }
+    ImGuiNative.ImFontAtlas_AddFontDefault(io.Fonts.NativePtr, null);
+    //io.Fonts.AddFontDefault();
+    io.Fonts.GetTexDataAsRGBA32(out byte* pixels, out int width, out int height);
 
-        static void DestroyFontsTexture()
-        {
-            var io = ImGui.GetIO();
-            RendererData* bd = GetBackendData();
+    int last_texture = GL.GetInteger(GetPName.TextureBinding2d);
+    bd->FontTexture = GL.GenTexture();
+    GL.BindTexture(TextureTarget.Texture2d, bd->FontTexture);
+    GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+    GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+    GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
+    GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureWrapT, (int)TextureWrapMode.ClampToEdge);
+    GL.PixelStorei(PixelStoreParameter.UnpackRowLength, 0);
+    GL.TexImage2D(TextureTarget.Texture2d, 0, InternalFormat.Rgba, width, height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)pixels);
 
-            if (bd->FontTexture != 0)
-            {
-                GL.DeleteTexture(bd->FontTexture);
-                io.Fonts.SetTexID(0);
-                bd->FontTexture = 0;
-            }
-        }
+    io.Fonts.SetTexID(bd->FontTexture);
 
-        static bool CheckShader(int handle, string desc)
-        {
-            GL.GetShaderi(handle, ShaderParameterName.CompileStatus, out int status);
-            GL.GetShaderi(handle, ShaderParameterName.InfoLogLength, out int logLength);
-            if (status == 0)
-                Console.Error.WriteLine($"ERROR: ImguiImplOpenGL3.CheckShader: Failed to compile {desc}!");
-            if (logLength > 1)
-            {
-                GL.GetShaderInfoLog(handle, out string log);
-                Console.Error.WriteLine(log);
-            }
-            return status == (int)All.True;
-        }
+    GL.BindTexture(TextureTarget.Texture2d, last_texture);
 
-        static bool CheckProgram(int handle, string desc)
-        {
-            GL.GetProgrami(handle, ProgramProperty.LinkStatus, out int status);
-            GL.GetProgrami(handle, ProgramProperty.InfoLogLength, out int logLength);
-            if (status == 0)
-                Console.Error.WriteLine($"ERROR: ImguiImplOpenGL3.CheckProgram: Failed to link {desc}!");
-            if (logLength > 1)
-            {
-                GL.GetProgramInfoLog(handle, out string log);
-                Console.Error.WriteLine(log);
-            }
-            return status == (int)All.True;
-        }
+    if (bd->KHRDebugAvailable)
+      GL.ObjectLabel(ObjectIdentifier.Texture, (uint)bd->FontTexture, -1, "OpenTK_ImGui: Font Texture");
+  }
 
-        static void CreateDeviceObjects()
-        {
-            RendererData* bd = GetBackendData();
+  private static void DestroyFontsTexture() {
+    var io = ImGui.GetIO();
+    RendererData* bd = GetBackendData();
 
-            int last_texture = GL.GetInteger(GetPName.TextureBinding2d);
-            int last_array_buffer = GL.GetInteger(GetPName.ArrayBufferBinding);
-            int last_pixel_unpack_buffer = GL.GetInteger(GetPName.PixelUnpackBufferBinding);
-            int last_vertex_array = GL.GetInteger(GetPName.VertexArrayBinding);
+    if (bd->FontTexture != 0) {
+      GL.DeleteTexture(bd->FontTexture);
+      io.Fonts.SetTexID(0);
+      bd->FontTexture = 0;
+    }
+  }
 
-            string vertex_shader_glsl_120 =
-                """
+  private static bool CheckShader(int handle, string desc) {
+    GL.GetShaderi(handle, ShaderParameterName.CompileStatus, out int status);
+    GL.GetShaderi(handle, ShaderParameterName.InfoLogLength, out int logLength);
+    if (status == 0)
+      Console.Error.WriteLine($"ERROR: ImguiImplOpenGL3.CheckShader: Failed to compile {desc}!");
+    if (logLength > 1) {
+      GL.GetShaderInfoLog(handle, out string log);
+      Console.Error.WriteLine(log);
+    }
+    return status == (int)All.True;
+  }
+
+  private static bool CheckProgram(int handle, string desc) {
+    GL.GetProgrami(handle, ProgramProperty.LinkStatus, out int status);
+    GL.GetProgrami(handle, ProgramProperty.InfoLogLength, out int logLength);
+    if (status == 0)
+      Console.Error.WriteLine($"ERROR: ImguiImplOpenGL3.CheckProgram: Failed to link {desc}!");
+    if (logLength > 1) {
+      GL.GetProgramInfoLog(handle, out string log);
+      Console.Error.WriteLine(log);
+    }
+    return status == (int)All.True;
+  }
+
+  private static void CreateDeviceObjects() {
+    RendererData* bd = GetBackendData();
+
+    int last_texture = GL.GetInteger(GetPName.TextureBinding2d);
+    int last_array_buffer = GL.GetInteger(GetPName.ArrayBufferBinding);
+    int last_pixel_unpack_buffer = GL.GetInteger(GetPName.PixelUnpackBufferBinding);
+    int last_vertex_array = GL.GetInteger(GetPName.VertexArrayBinding);
+
+    string vertex_shader_glsl_120 =
+        """
                 uniform mat4 ProjMtx;
                 attribute vec2 Position;
                 attribute vec2 UV;
@@ -346,8 +323,8 @@ public unsafe static class ImguiImplOpenGL3 {
                 }
                 """;
 
-            string vertex_shader_glsl_130 =
-                """
+    string vertex_shader_glsl_130 =
+        """
                 uniform mat4 ProjMtx;
                 in vec2 Position;
                 in vec2 UV;
@@ -362,8 +339,8 @@ public unsafe static class ImguiImplOpenGL3 {
                 }
                 """;
 
-            string vertex_shader_glsl_300_es =
-                """
+    string vertex_shader_glsl_300_es =
+        """
                 precision highp float;
                 layout(location = 0) in vec2 Position;
                 layout(location = 1) in vec2 UV;
@@ -379,8 +356,8 @@ public unsafe static class ImguiImplOpenGL3 {
                 }
                 """;
 
-            string vertex_shader_glsl_410_core =
-                """
+    string vertex_shader_glsl_410_core =
+        """
                 layout(location = 0) in vec2 Position;
                 layout(location = 1) in vec2 UV;
                 layout(location = 2) in vec4 Color;
@@ -395,8 +372,8 @@ public unsafe static class ImguiImplOpenGL3 {
                 }
                 """;
 
-            string fragment_shader_glsl_120 =
-                """
+    string fragment_shader_glsl_120 =
+        """
                 #ifdef GL_ES
                     precision mediump float;
                 #endif
@@ -409,8 +386,8 @@ public unsafe static class ImguiImplOpenGL3 {
                 }
                 """;
 
-            string fragment_shader_glsl_130 =
-                """
+    string fragment_shader_glsl_130 =
+        """
                 uniform sampler2D Texture;
                 in vec2 Frag_UV;
                 in vec4 Frag_Color;
@@ -421,8 +398,8 @@ public unsafe static class ImguiImplOpenGL3 {
                 }
                 """;
 
-            string fragment_shader_glsl_300_es =
-                """
+    string fragment_shader_glsl_300_es =
+        """
                 precision mediump float;
                 uniform sampler2D Texture;
                 in vec2 Frag_UV;
@@ -434,8 +411,8 @@ public unsafe static class ImguiImplOpenGL3 {
                 }
                 """;
 
-            string fragment_shader_glsl_410_core =
-                """
+    string fragment_shader_glsl_410_core =
+        """
                 uniform sampler2D Texture;
                 in vec2 Frag_UV;
                 in vec4 Frag_Color;
@@ -446,102 +423,90 @@ public unsafe static class ImguiImplOpenGL3 {
                 }
                 """;
 
-            string vertex_shader;
-            string fragment_shader;
-            if (bd->GlslVersion < 130)
-            {
-                vertex_shader = vertex_shader_glsl_120;
-                fragment_shader = fragment_shader_glsl_120;
-            }
-            else if (bd->GlslVersion >= 410)
-            {
-                vertex_shader = vertex_shader_glsl_410_core;
-                fragment_shader = fragment_shader_glsl_410_core;
-            }
-            else if (bd->GlslVersion == 300)
-            {
-                vertex_shader = vertex_shader_glsl_300_es;
-                fragment_shader = fragment_shader_glsl_300_es;
-            }
-            else
-            {
-                vertex_shader = vertex_shader_glsl_130;
-                fragment_shader = fragment_shader_glsl_130;
-            }
+    string vertex_shader;
+    string fragment_shader;
+    if (bd->GlslVersion < 130) {
+      vertex_shader = vertex_shader_glsl_120;
+      fragment_shader = fragment_shader_glsl_120;
+    } else if (bd->GlslVersion >= 410) {
+      vertex_shader = vertex_shader_glsl_410_core;
+      fragment_shader = fragment_shader_glsl_410_core;
+    } else if (bd->GlslVersion == 300) {
+      vertex_shader = vertex_shader_glsl_300_es;
+      fragment_shader = fragment_shader_glsl_300_es;
+    } else {
+      vertex_shader = vertex_shader_glsl_130;
+      fragment_shader = fragment_shader_glsl_130;
+    }
 
-            vertex_shader = vertex_shader.Insert(0, $"#version {bd->GlslVersion}{Environment.NewLine}");
-            fragment_shader = fragment_shader.Insert(0, $"#version {bd->GlslVersion}{Environment.NewLine}");
+    vertex_shader = vertex_shader.Insert(0, $"#version {bd->GlslVersion}{Environment.NewLine}");
+    fragment_shader = fragment_shader.Insert(0, $"#version {bd->GlslVersion}{Environment.NewLine}");
 
-            int vert = GL.CreateShader(ShaderType.VertexShader);
-            // FIXME: Version string...
-            GL.ShaderSource(vert, vertex_shader);
-            GL.CompileShader(vert);
-            CheckShader(vert, "vertex shader");
+    int vert = GL.CreateShader(ShaderType.VertexShader);
+    // FIXME: Version string...
+    GL.ShaderSource(vert, vertex_shader);
+    GL.CompileShader(vert);
+    CheckShader(vert, "vertex shader");
 
-            int frag = GL.CreateShader(ShaderType.FragmentShader);
-            // FIXME: Version string...
-            GL.ShaderSource(frag, fragment_shader);
-            GL.CompileShader(frag);
-            CheckShader(frag, "fragment shader");
+    int frag = GL.CreateShader(ShaderType.FragmentShader);
+    // FIXME: Version string...
+    GL.ShaderSource(frag, fragment_shader);
+    GL.CompileShader(frag);
+    CheckShader(frag, "fragment shader");
 
-            bd->ShaderHandle = GL.CreateProgram();
-            GL.AttachShader(bd->ShaderHandle, vert);
-            GL.AttachShader(bd->ShaderHandle, frag);
-            GL.LinkProgram(bd->ShaderHandle);
-            CheckProgram(bd->ShaderHandle, "shader program");
+    bd->ShaderHandle = GL.CreateProgram();
+    GL.AttachShader(bd->ShaderHandle, vert);
+    GL.AttachShader(bd->ShaderHandle, frag);
+    GL.LinkProgram(bd->ShaderHandle);
+    CheckProgram(bd->ShaderHandle, "shader program");
 
-            GL.DetachShader(bd->ShaderHandle, vert);
-            GL.DetachShader(bd->ShaderHandle, frag);
-            GL.DeleteShader(vert);
-            GL.DeleteShader(frag);
+    GL.DetachShader(bd->ShaderHandle, vert);
+    GL.DetachShader(bd->ShaderHandle, frag);
+    GL.DeleteShader(vert);
+    GL.DeleteShader(frag);
 
-            bd->UniformLocationTex = GL.GetUniformLocation(bd->ShaderHandle, "Texture");
-            bd->UniformLocationProjMtx = GL.GetUniformLocation(bd->ShaderHandle, "ProjMtx");
-            bd->AttribLocationVtxPos = GL.GetAttribLocation(bd->ShaderHandle, "Position");
-            bd->AttribLocationVtxUV = GL.GetAttribLocation(bd->ShaderHandle, "UV");
-            bd->AttribLocationVtxColor = GL.GetAttribLocation(bd->ShaderHandle, "Color");
+    bd->UniformLocationTex = GL.GetUniformLocation(bd->ShaderHandle, "Texture");
+    bd->UniformLocationProjMtx = GL.GetUniformLocation(bd->ShaderHandle, "ProjMtx");
+    bd->AttribLocationVtxPos = GL.GetAttribLocation(bd->ShaderHandle, "Position");
+    bd->AttribLocationVtxUV = GL.GetAttribLocation(bd->ShaderHandle, "UV");
+    bd->AttribLocationVtxColor = GL.GetAttribLocation(bd->ShaderHandle, "Color");
 
-            bd->VboHandle = GL.GenBuffer();
-            bd->EboHandle = GL.GenBuffer();
+    bd->VboHandle = GL.GenBuffer();
+    bd->EboHandle = GL.GenBuffer();
 
-            CreateFontsTexture();
+    CreateFontsTexture();
 
-            GL.BindTexture(TextureTarget.Texture2d, last_texture);
-            GL.BindBuffer(BufferTarget.ArrayBuffer, last_array_buffer);
-            GL.BindBuffer(BufferTarget.PixelUnpackBuffer, last_pixel_unpack_buffer);
-            GL.BindVertexArray(last_vertex_array);
+    GL.BindTexture(TextureTarget.Texture2d, last_texture);
+    GL.BindBuffer(BufferTarget.ArrayBuffer, last_array_buffer);
+    GL.BindBuffer(BufferTarget.PixelUnpackBuffer, last_pixel_unpack_buffer);
+    GL.BindVertexArray(last_vertex_array);
 
-            if (bd->KHRDebugAvailable)
-            {
-                GL.ObjectLabel(ObjectIdentifier.Buffer, (uint)bd->VboHandle, -1, "OpenTK_ImGui: VBO");
-                GL.ObjectLabel(ObjectIdentifier.Buffer, (uint)bd->EboHandle, -1, "OpenTK_ImGui: EBO");
-                GL.ObjectLabel(ObjectIdentifier.Shader, (uint)bd->ShaderHandle, -1, "OpenTK_ImGui: Shader");
-            }
-        }
+    if (bd->KHRDebugAvailable) {
+      GL.ObjectLabel(ObjectIdentifier.Buffer, (uint)bd->VboHandle, -1, "OpenTK_ImGui: VBO");
+      GL.ObjectLabel(ObjectIdentifier.Buffer, (uint)bd->EboHandle, -1, "OpenTK_ImGui: EBO");
+      GL.ObjectLabel(ObjectIdentifier.Shader, (uint)bd->ShaderHandle, -1, "OpenTK_ImGui: Shader");
+    }
+  }
 
-        static void DestroyDeviceObjects()
-        {
-            RendererData* bd = GetBackendData();
+  private static void DestroyDeviceObjects() {
+    RendererData* bd = GetBackendData();
 
-            if (bd->VboHandle != 0)
-            {
-                GL.DeleteBuffer(bd->VboHandle);
-                bd->VboHandle = 0;
-            }
+    if (bd->VboHandle != 0) {
+      GL.DeleteBuffer(bd->VboHandle);
+      bd->VboHandle = 0;
+    }
 
-            if (bd->EboHandle != 0)
-            {
-                GL.DeleteBuffer(bd->EboHandle);
-                bd->EboHandle = 0;
-            }
+    if (bd->EboHandle != 0) {
+      GL.DeleteBuffer(bd->EboHandle);
+      bd->EboHandle = 0;
+    }
 
-            if (bd->ShaderHandle != 0)
-            {
-                GL.DeleteProgram(bd->ShaderHandle);
-                bd->ShaderHandle = 0;
-            }
+    if (bd->ShaderHandle != 0) {
+      GL.DeleteProgram(bd->ShaderHandle);
+      bd->ShaderHandle = 0;
+    }
 
-            DestroyFontsTexture();
-        }
+    DestroyFontsTexture();
+  }
 
 }
