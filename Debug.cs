@@ -6,8 +6,8 @@ public static class Debug {
     GLDebugProc DebugMessageDelegate = OnDebugMessage;
     GL.DebugMessageCallback(DebugMessageDelegate, nint.Zero);
     GL.Enable(EnableCap.DebugOutput);
-
-    GL.Enable(EnableCap.DebugOutputSynchronous);
+    // Synchronous callbacks stall the CPU; async is enough for non-breaking messages.
+    GL.Disable(EnableCap.DebugOutputSynchronous);
   }
 
   public static void OnDebugMessage(
@@ -18,6 +18,10 @@ public static class Debug {
         int length,
         nint pmessage,
         nint userParam) {
+    // Drivers spam NOTIFICATION for benign "buffer will use VIDEO memory" hints every frame.
+    if (severity == DebugSeverity.DebugSeverityNotification || severity == DebugSeverity.DebugSeverityLow)
+      return;
+
     string message = Marshal.PtrToStringAnsi(pmessage, length);
     Console.WriteLine("[{0} source={1} type={2} id={3}] {4}", severity, source, type, id, message);
   }

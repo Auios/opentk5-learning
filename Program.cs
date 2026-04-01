@@ -12,7 +12,7 @@ public static class Program {
   private static bool showImGuiDemoWindow;
 
   public static void Main(string[] args) {
-    Window.Init(800, 600, "Uptime");
+    Window.Init(1800, 1200, "Uptime");
     Debug.Init();
 
     ImGuiApp.Init();

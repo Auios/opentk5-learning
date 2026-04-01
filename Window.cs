@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using ImGuiNET;
 using OpenTK.Core.Utility;
+using LogLevel = OpenTK.Core.Utility.LogLevel;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 using OpenTK.Platform;
@@ -62,9 +63,9 @@ public static class Window {
   }
 
   public static void Init(int width, int height, string title) {
-    size = new Vector2i(width, height);
     ToolkitOptions options = new() {
-      Logger = new ConsoleLogger(),
+      // Default is LogLevel.Debug — very noisy. Warnings/errors only unless you raise this.
+      Logger = new ConsoleLogger { Filter = LogLevel.Warning },
     };
     Toolkit.Init(options);
 
@@ -81,10 +82,11 @@ public static class Window {
 
     Toolkit.Window.SetMode(handle, WindowMode.Normal);
     Toolkit.Window.SetBorderStyle(handle, WindowBorderStyle.FixedBorder);
-    Toolkit.Window.SetClientSize(handle, new Vector2i(800, 600));
-    GL.Viewport(0, 0, 800, 600);
+    Toolkit.Window.SetClientSize(handle, new Vector2i(width, height));
 
     Toolkit.Window.GetClientSize(handle, out Vector2i clientSize);
+    size = clientSize;
+    GL.Viewport(0, 0, size.X, size.Y);
     float aspect = clientSize.Y > 0 ? (float)clientSize.X / clientSize.Y : 1.33f;
     Camera = new Camera(aspect);
 
