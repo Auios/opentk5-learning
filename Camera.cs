@@ -5,8 +5,11 @@ public class Camera {
   float yaw;
   float pitch;
 
+  Vector3 front;
+  Vector3 right;
+  Vector3 up;
+
   Matrix4 projection;
-  Matrix4 transform;
   Matrix4 view;
 
   float near = 0.1f;
@@ -15,13 +18,28 @@ public class Camera {
   float moveSpeed = 0.05f;
   float lookSpeed = 2.5f;
 
-  public Camera(float aspectRatio) {
-    position = new Vector3(0f, 0.5f, 1.5f);
-    yaw = 0f;
-    pitch = -0.3f;
+  /// <summary>Default eye position; cube sits at origin with no translation on the model matrix.</summary>
+  public static Vector3 DefaultEye => new Vector3(0f, 0.5f, 1.5f);
 
+  public Camera(float aspectRatio) {
     projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90f), aspectRatio, near, far);
 
+    OrientToward(Vector3.Zero, DefaultEye);
+
+    Update();
+  }
+
+  /// <summary>Sets yaw/pitch so the camera at <paramref name="eye"/> looks toward <paramref name="target"/>.</summary>
+  public void OrientToward(Vector3 target, Vector3 eye) {
+    position = eye;
+    Vector3 forward = Vector3.Normalize(target - position);
+    pitch = MathF.Asin(Math.Clamp(forward.Y, -1f, 1f));
+    yaw = MathF.Atan2(forward.X, forward.Z);
+  }
+
+  /// <summary>Reset to default position and facing the cube at the origin.</summary>
+  public void ResetToDefaultView() {
+    OrientToward(Vector3.Zero, DefaultEye);
     Update();
   }
 
@@ -51,11 +69,9 @@ public class Camera {
   }
 
   public void Move(Vector3 move) {
-    Vector3 right = transform.Row0.Xyz;
-    Vector3 up = transform.Row1.Xyz;
-    Vector3 front = transform.Row2.Xyz;
-
-    Vector3 direction = (move.X * right) + (move.Y * up) + (move.Z * front);
+    // Window uses W -> Move.Z -= 1 (negative Z = "forward" input). That must map to +front, so use -move.Z * front.
+    // Strafe uses move.X * right so A (negative X) gives -right (strafe left).
+    Vector3 direction = (move.X * right) + (move.Y * up) - (move.Z * front);
 
     position += direction * moveSpeed;
 
@@ -63,14 +79,15 @@ public class Camera {
   }
 
   public void Update() {
-    Matrix3 rotation =
-      Matrix3.CreateRotationX(pitch) *
-      Matrix3.CreateRotationY(yaw);
+    float x = MathF.Cos(pitch) * MathF.Sin(yaw);
+    float y = MathF.Sin(pitch);
+    float z = MathF.Cos(pitch) * MathF.Cos(yaw);
 
-    transform = new Matrix4(rotation);
-    transform.Row3 = new Vector4(position, 1f);
+    front = Vector3.Normalize(new Vector3(x, y, z));
+    right = Vector3.Normalize(Vector3.Cross(front, Vector3.UnitY));
+    up = Vector3.Normalize(Vector3.Cross(right, front));
 
-    view = transform.Inverted();
+    view = Matrix4.LookAt(position, position + front, up);
   }
 
   public Matrix4 Projection => projection;

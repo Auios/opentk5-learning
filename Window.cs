@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using OpenTK.Core.Utility;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
@@ -20,6 +21,25 @@ public static class Window {
   private static bool grabbed;
 
   public static Vector3 Move = Vector3.Zero;
+
+  private static readonly HashSet<Scancode> movementKeysHeld = new();
+
+  /// <summary>
+  /// Rebuilds <see cref="Move"/> from keys currently held. Using accumulation + KeyUp deltas gets out of sync
+  /// if <see cref="Move"/> is cleared while keys stay down (e.g. camera reset).
+  /// </summary>
+  private static void RebuildMoveVector() {
+    Move.X = 0f;
+    Move.Z = 0f;
+    if (movementKeysHeld.Contains(Scancode.A))
+      Move.X -= 1f;
+    if (movementKeysHeld.Contains(Scancode.D))
+      Move.X += 1f;
+    if (movementKeysHeld.Contains(Scancode.W))
+      Move.Z -= 1f;
+    if (movementKeysHeld.Contains(Scancode.S))
+      Move.Z += 1f;
+  }
 
   public static void ResetMouseLook() {
     lastMouse = Vector2.Zero;
@@ -58,6 +78,8 @@ public static class Window {
     EventQueue.EventRaised += HandleEvents;
 
     Window.SetPosition(Monitor.GetCenter() - Window.GetSize() / 2);
+
+    GrabMouseLook();
   }
 
   public static void SetPosition(Vector2i position) {
@@ -72,6 +94,15 @@ public static class Window {
     Toolkit.OpenGL.SwapBuffers(context);
   }
 
+  /// <summary>Mouselook: locked cursor, hidden cursor, camera rotates with mouse.</summary>
+  public static void GrabMouseLook() {
+    Toolkit.Window.SetCursorCaptureMode(handle, CursorCaptureMode.Locked);
+    Toolkit.Window.SetCursor(handle, null);
+    grabbed = true;
+    ResetMouseLook();
+  }
+
+  /// <summary>Mouse mode: free cursor (e.g. while Alt is held), no camera rotation from mouse.</summary>
   public static void ReleaseMouseLook() {
     grabbed = false;
     Toolkit.Window.SetCursorCaptureMode(handle, CursorCaptureMode.Normal);
@@ -90,21 +121,14 @@ public static class Window {
           break;
         switch (keyDown.Scancode) {
           case Scancode.LeftAlt:
-            Toolkit.Window.SetCursorCaptureMode(handle, CursorCaptureMode.Locked);
-            Toolkit.Window.SetCursor(handle, null);
-            grabbed = true;
+            ReleaseMouseLook();
             break;
           case Scancode.W:
-            Move.Z -= 1f;
-            break;
           case Scancode.S:
-            Move.Z += 1f;
-            break;
           case Scancode.A:
-            Move.X -= 1f;
-            break;
           case Scancode.D:
-            Move.X += 1f;
+            movementKeysHeld.Add(keyDown.Scancode);
+            RebuildMoveVector();
             break;
         }
         if (keyDown.Key == Key.Escape)
@@ -114,21 +138,14 @@ public static class Window {
       case KeyUpEventArgs keyUp:
         switch (keyUp.Scancode) {
           case Scancode.LeftAlt:
-            Toolkit.Window.SetCursorCaptureMode(handle, CursorCaptureMode.Normal);
-            Toolkit.Window.SetCursor(handle, defaultCursor);
-            grabbed = false;
+            GrabMouseLook();
             break;
           case Scancode.W:
-            Move.Z += 1f;
-            break;
           case Scancode.S:
-            Move.Z -= 1f;
-            break;
           case Scancode.A:
-            Move.X += 1f;
-            break;
           case Scancode.D:
-            Move.X -= 1f;
+            movementKeysHeld.Remove(keyUp.Scancode);
+            RebuildMoveVector();
             break;
         }
         break;

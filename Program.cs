@@ -99,12 +99,7 @@ public static class Program {
       if (Toolkit.Window.IsWindowDestroyed(Window.handle)) break;
 
       if (Window.CameraResetRequested) {
-        cam.Position = new Vector3(0f, 0.5f, 1.5f);
-        cam.Pitch = -0.3f;
-        cam.Yaw = 0f;
-        Window.Move = Vector3.Zero;
-        Window.ReleaseMouseLook();
-        cam.Update();
+        cam.ResetToDefaultView();
         Window.CameraResetRequested = false;
       }
 
