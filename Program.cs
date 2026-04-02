@@ -5,8 +5,11 @@ using OpenTK.Mathematics;
 using OpenTK.Platform;
 
 public static class Program {
+  /// <summary>When true, the mouse is free for UI; camera movement and mouselook are disabled.</summary>
+  public static bool UiMode => Window.UiMode;
+
   private static bool drawLines = true;
-  private static bool showImGuiDemoWindow;
+  private static bool imguiDemoOpen;
 
   public static void Main(string[] args) {
     Window.Init(1800, 1200, "Uptime");
@@ -59,7 +62,8 @@ public static class Program {
         Window.cameraResetRequested = false;
       }
 
-      cam.Move(Window.move);
+      if (!Window.UiMode)
+        cam.Move(Window.move);
 
       Toolkit.Window.GetClientSize(Window.handle, out Vector2i clientPx);
       int vw = clientPx.X > 0 ? clientPx.X : 800;
@@ -83,7 +87,7 @@ public static class Program {
         GL.UniformMatrix4f(uView, 1, true, ref view);
         GL.UniformMatrix4f(uProjection, 1, true, ref proj);
         GL.Uniform1i(uHoveredObject, hoveredObject);
-        GL.Uniform1i(uHoverEnabled, Window.Grabbed ? 0 : 1);
+        GL.Uniform1i(uHoverEnabled, Window.UiMode ? 0 : 1);
         GL.ActiveTexture(TextureUnit.Texture0);
         GL.BindTexture(TextureTarget.Texture2d, brickTexture.handle);
         GL.Uniform1i(uTex, 0);
@@ -135,10 +139,18 @@ public static class Program {
 
         if (ImGui.IsKeyPressed(ImGuiKey.H))
           drawLines = !drawLines;
-        if (ImGui.IsKeyPressed(ImGuiKey.E))
-          showImGuiDemoWindow = !showImGuiDemoWindow;
-        if (showImGuiDemoWindow)
-          ImGui.ShowDemoWindow(ref showImGuiDemoWindow);
+        if (ImGui.IsKeyPressed(ImGuiKey.E)) {
+          Window.ToggleUiMode();
+          if (Window.UiMode)
+            imguiDemoOpen = true;
+        }
+        if (Window.UiMode) {
+          ImGui.ShowDemoWindow(ref imguiDemoOpen);
+          if (!imguiDemoOpen)
+            Window.SetUiMode(false);
+        } else {
+          imguiDemoOpen = false;
+        }
 
         ImGuiApp.RenderDrawData();
 

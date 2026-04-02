@@ -32,7 +32,7 @@ public static class ImGuiApp {
     io.DisplayFramebufferScale = Vector2.One;
     io.DeltaTime = dt;
 
-    if (Window.Grabbed)
+    if (!Window.UiMode)
       io.ConfigFlags |= ImGuiConfigFlags.NoMouse;
     else
       io.ConfigFlags &= ~ImGuiConfigFlags.NoMouse;

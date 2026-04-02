@@ -22,8 +22,10 @@ public static class Window {
   private static CursorHandle defaultCursor = null!;
   private static bool grabbed;
 
-  /// <summary>True while cursor is locked (mouselook); false in Alt "mouse mode".</summary>
-  public static bool Grabbed => grabbed;
+  private static bool uiMode;
+
+  /// <summary>When true, the cursor is free and WASD / mouse look do not move the camera (ImGui and UI interaction).</summary>
+  public static bool UiMode => uiMode;
 
   /// <summary>Latest pointer position in client coordinates (updated every <see cref="MouseMoveEventArgs"/>).</summary>
   public static Vector2 clientPointer;
@@ -96,6 +98,7 @@ public static class Window {
 
     Window.SetPosition(Monitor.GetCenter() - (Window.GetSize() / 2));
 
+    uiMode = false;
     GrabMouseLook();
 
     clientPointer = new Vector2(size.X * 0.5f, size.Y * 0.5f);
@@ -124,12 +127,27 @@ public static class Window {
     ResetMouseLook();
   }
 
-  /// <summary>Mouse mode: free cursor (e.g. while Alt is held), no camera rotation from mouse.</summary>
+  /// <summary>Mouse mode: free cursor, no camera rotation from mouse.</summary>
   public static void ReleaseMouseLook() {
     grabbed = false;
     Toolkit.Window.SetCursorCaptureMode(handle, CursorCaptureMode.Normal);
     Toolkit.Window.SetCursor(handle, defaultCursor);
     ResetMouseLook();
+  }
+
+  /// <summary>Applies cursor capture and input routing for UI vs gameplay.</summary>
+  public static void SetUiMode(bool enabled) {
+    if (uiMode == enabled)
+      return;
+    uiMode = enabled;
+    if (uiMode)
+      ReleaseMouseLook();
+    else
+      GrabMouseLook();
+  }
+
+  public static void ToggleUiMode() {
+    SetUiMode(!uiMode);
   }
 
   public static void HandleEvents(PalHandle palHandle, PlatformEventType type, EventArgs args) {
@@ -146,9 +164,6 @@ public static class Window {
         if (keyDown.IsRepeat)
           break;
         switch (keyDown.Scancode) {
-          case Scancode.LeftAlt:
-            ReleaseMouseLook();
-            break;
           case Scancode.R:
             cameraResetRequested = true;
             break;
@@ -156,12 +171,18 @@ public static class Window {
           case Scancode.S:
           case Scancode.A:
           case Scancode.D:
-            movementKeysHeld.Add(keyDown.Scancode);
-            RebuildMoveVector();
+            if (!uiMode) {
+              movementKeysHeld.Add(keyDown.Scancode);
+              RebuildMoveVector();
+            }
             break;
         }
-        if (keyDown.Key == Key.Escape)
-          Toolkit.Window.Destroy(Window.handle);
+        if (keyDown.Key == Key.Escape) {
+          if (uiMode)
+            SetUiMode(false);
+          else
+            Toolkit.Window.Destroy(Window.handle);
+        }
         break;
 
       case KeyUpEventArgs keyUp:
@@ -170,9 +191,6 @@ public static class Window {
           imGuiKeyEvents.Add((imguiKeyUp.Value, false));
 
         switch (keyUp.Scancode) {
-          case Scancode.LeftAlt:
-            GrabMouseLook();
-            break;
           case Scancode.W:
           case Scancode.S:
           case Scancode.A:
