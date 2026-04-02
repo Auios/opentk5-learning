@@ -38,7 +38,7 @@ public class Shader {
 
     GL.GetShaderi(shaderHandle, ShaderParameterName.CompileStatus, out int code);
     if (code != (int)All.True) {
-      GL.GetShaderInfoLog(shaderHandle, out var infoLog);
+      GL.GetShaderInfoLog(shaderHandle, out string infoLog);
       throw new Exception($"Error compiling shader.{Environment.NewLine}{infoLog}");
     }
   }
@@ -48,7 +48,7 @@ public class Shader {
 
     GL.GetProgrami(shaderHandle, ProgramProperty.LinkStatus, out int code);
     if (code != (int)All.True) {
-      GL.GetProgramInfoLog(shaderHandle, out var infoLog);
+      GL.GetProgramInfoLog(shaderHandle, out string infoLog);
       throw new Exception($"Error linking program.{Environment.NewLine}{infoLog}");
     }
   }

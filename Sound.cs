@@ -12,7 +12,7 @@ public sealed class Sound : IDisposable {
     if (this.device == default)
       throw new InvalidOperationException("Failed to open OpenAL device.");
 
-    this.context = OpenTK.Audio.OpenAL.ALC.ALC.CreateContext(this.device, Array.Empty<int>());
+    this.context = OpenTK.Audio.OpenAL.ALC.ALC.CreateContext(this.device, []);
     if (this.context == default)
       throw new InvalidOperationException("Failed to create OpenAL context.");
 
@@ -37,7 +37,7 @@ public sealed class Sound : IDisposable {
 
   private static void LoadWave(string path, out byte[] data, out Format format, out int sampleRate) {
     using FileStream stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-    using BinaryReader reader = new BinaryReader(stream);
+    using BinaryReader reader = new(stream);
 
     if (new string(reader.ReadChars(4)) != "RIFF")
       throw new FormatException("Invalid WAV file header.");
@@ -49,10 +49,10 @@ public sealed class Sound : IDisposable {
     short channels = 0;
     short bitsPerSample = 0;
     sampleRate = 0;
-    data = Array.Empty<byte>();
+    data = [];
 
     while (reader.BaseStream.Position < reader.BaseStream.Length) {
-      string chunkId = new string(reader.ReadChars(4));
+      string chunkId = new(reader.ReadChars(4));
       int chunkSize = reader.ReadInt32();
 
       switch (chunkId) {

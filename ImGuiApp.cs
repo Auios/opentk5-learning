@@ -37,16 +37,16 @@ public static class ImGuiApp {
     else
       io.ConfigFlags &= ~ImGuiConfigFlags.NoMouse;
 
-    foreach ((ImGuiKey key, bool down) in Window.ImGuiKeyEvents)
+    foreach ((ImGuiKey key, bool down) in Window.imGuiKeyEvents)
       io.AddKeyEvent(key, down);
-    Window.ImGuiKeyEvents.Clear();
+    Window.imGuiKeyEvents.Clear();
 
-    io.AddMousePosEvent(Window.ClientPointer.X, Window.ClientPointer.Y);
-    io.AddMouseButtonEvent(0, Window.MouseLeft);
-    io.AddMouseButtonEvent(1, Window.MouseRight);
-    io.AddMouseButtonEvent(2, Window.MouseMiddle);
-    io.AddMouseWheelEvent(Window.ScrollAccum.X, Window.ScrollAccum.Y);
-    Window.ScrollAccum = OpenTK.Mathematics.Vector2.Zero;
+    io.AddMousePosEvent(Window.clientPointer.X, Window.clientPointer.Y);
+    io.AddMouseButtonEvent(0, Window.mouseLeft);
+    io.AddMouseButtonEvent(1, Window.mouseRight);
+    io.AddMouseButtonEvent(2, Window.mouseMiddle);
+    io.AddMouseWheelEvent(Window.scrollAccum.X, Window.scrollAccum.Y);
+    Window.scrollAccum = OpenTK.Mathematics.Vector2.Zero;
 
     ImguiImplOpenGL3.NewFrame();
     ImGui.NewFrame();

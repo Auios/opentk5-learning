@@ -5,23 +5,24 @@ using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Vector2 = System.Numerics.Vector2;
 
 namespace Opentk5Learning.ImGuiBackends;
 
 public unsafe static class ImguiImplOpenGL3 {
   private struct RendererData {
-    public int FontTexture;
-    public int ShaderHandle;
-    public int UniformLocationTex;
-    public int UniformLocationProjMtx;
-    public int AttribLocationVtxPos;
-    public int AttribLocationVtxUV;
-    public int AttribLocationVtxColor;
-    public int VboHandle;
-    public int EboHandle;
+    public int fontTexture;
+    public int shaderHandle;
+    public int uniformLocationTex;
+    public int uniformLocationProjMtx;
+    public int attribLocationVtxPos;
+    public int attribLocationVtxUV;
+    public int attribLocationVtxColor;
+    public int vboHandle;
+    public int eboHandle;
 
-    public int GlslVersion;
-    public bool KHRDebugAvailable;
+    public int glslVersion;
+    public bool kHRDebugAvailable;
   }
 
   private static RendererData* GetBackendData() {
@@ -29,14 +30,14 @@ public unsafe static class ImguiImplOpenGL3 {
   }
 
   public static bool Init(bool useKHRDebugIfAvailable = true) {
-    var io = ImGui.GetIO();
+    ImGuiIOPtr io = ImGui.GetIO();
 
     RendererData* bd = (RendererData*)NativeMemory.AllocZeroed((uint)sizeof(RendererData));
 
     int major = GL.GetInteger(GetPName.MajorVersion);
     int minor = GL.GetInteger(GetPName.MinorVersion);
 
-    bd->GlslVersion = (major, minor) switch {
+    bd->glslVersion = (major, minor) switch {
       (4, 6) => 460,
       (4, 5) => 450,
       (4, 4) => 440,
@@ -53,7 +54,7 @@ public unsafe static class ImguiImplOpenGL3 {
       _ => 110,
     };
 
-    bd->KHRDebugAvailable = useKHRDebugIfAvailable && (major > 4 || (major == 4 && minor >= 3));
+    bd->kHRDebugAvailable = useKHRDebugIfAvailable && (major > 4 || (major == 4 && minor >= 3));
 
     io.BackendRendererUserData = (IntPtr)bd;
     io.NativePtr->BackendRendererName = (byte*)Unsafe.AsPointer(ref MemoryMarshal.GetReference("opentk_impl_opengl3"u8));
@@ -64,7 +65,7 @@ public unsafe static class ImguiImplOpenGL3 {
   }
 
   public static void Shutdown() {
-    var io = ImGui.GetIO();
+    ImGuiIOPtr io = ImGui.GetIO();
 
     RendererData* bd = (RendererData*)io.NativePtr->BackendRendererUserData;
 
@@ -79,10 +80,11 @@ public unsafe static class ImguiImplOpenGL3 {
   public static void NewFrame() {
     RendererData* bd = GetBackendData();
 
-    if (bd->ShaderHandle == 0) {
+    if (bd->shaderHandle == 0) {
       CreateDeviceObjects();
     }
-    if (bd->FontTexture == 0) {
+
+    if (bd->fontTexture == 0) {
       CreateFontsTexture();
     }
   }
@@ -113,23 +115,23 @@ public unsafe static class ImguiImplOpenGL3 {
     if (clip_origin_lower_left == false)
       (T, B) = (B, T); // Swap top and bottom if origin is upper left.
     Matrix4 mvp = Matrix4.CreateOrthographicOffCenter(L, R, B, T, -1, 1);
-    GL.UseProgram(bd->ShaderHandle);
-    GL.Uniform1i(bd->UniformLocationTex, 0);
-    GL.UniformMatrix4f(bd->UniformLocationProjMtx, 1, true, ref mvp);
+    GL.UseProgram(bd->shaderHandle);
+    GL.Uniform1i(bd->uniformLocationTex, 0);
+    GL.UniformMatrix4f(bd->uniformLocationProjMtx, 1, true, ref mvp);
 
     GL.BindSampler(0, 0);
 
     GL.BindVertexArray(vao);
-    GL.BindBuffer(BufferTarget.ArrayBuffer, bd->VboHandle);
-    GL.BindBuffer(BufferTarget.ElementArrayBuffer, bd->EboHandle);
-    GL.EnableVertexAttribArray((uint)bd->AttribLocationVtxPos);
-    GL.EnableVertexAttribArray((uint)bd->AttribLocationVtxUV);
-    GL.EnableVertexAttribArray((uint)bd->AttribLocationVtxColor);
-    GL.VertexAttribPointer((uint)bd->AttribLocationVtxPos, 2, VertexAttribPointerType.Float, false, sizeof(ImDrawVert), (void*)0);
-    GL.VertexAttribPointer((uint)bd->AttribLocationVtxUV, 2, VertexAttribPointerType.Float, false, sizeof(ImDrawVert), (void*)8);
-    GL.VertexAttribPointer((uint)bd->AttribLocationVtxColor, 4, VertexAttribPointerType.UnsignedByte, true, sizeof(ImDrawVert), (void*)16);
+    GL.BindBuffer(BufferTarget.ArrayBuffer, bd->vboHandle);
+    GL.BindBuffer(BufferTarget.ElementArrayBuffer, bd->eboHandle);
+    GL.EnableVertexAttribArray((uint)bd->attribLocationVtxPos);
+    GL.EnableVertexAttribArray((uint)bd->attribLocationVtxUV);
+    GL.EnableVertexAttribArray((uint)bd->attribLocationVtxColor);
+    GL.VertexAttribPointer((uint)bd->attribLocationVtxPos, 2, VertexAttribPointerType.Float, false, sizeof(ImDrawVert), (void*)0);
+    GL.VertexAttribPointer((uint)bd->attribLocationVtxUV, 2, VertexAttribPointerType.Float, false, sizeof(ImDrawVert), (void*)8);
+    GL.VertexAttribPointer((uint)bd->attribLocationVtxColor, 4, VertexAttribPointerType.UnsignedByte, true, sizeof(ImDrawVert), (void*)16);
 
-    if (bd->KHRDebugAvailable)
+    if (bd->kHRDebugAvailable)
       GL.ObjectLabel(ObjectIdentifier.VertexArray, (uint)vao, -1, "OpenTK_ImGui: VAO");
   }
 
@@ -170,8 +172,8 @@ public unsafe static class ImguiImplOpenGL3 {
     int vao = GL.GenVertexArray();
     SetupRenderState(drawData, fbWidth, fbHeight, vao);
 
-    var clipOff = drawData.DisplayPos;
-    var clipScale = drawData.FramebufferScale;
+    Vector2 clipOff = drawData.DisplayPos;
+    Vector2 clipScale = drawData.FramebufferScale;
     for (int n = 0; n < drawData.CmdListsCount; n++) {
       ImDrawListPtr drawList = drawData.CmdLists[n];
 
@@ -239,7 +241,7 @@ public unsafe static class ImguiImplOpenGL3 {
   }
 
   private static void CreateFontsTexture() {
-    var io = ImGui.GetIO();
+    ImGuiIOPtr io = ImGui.GetIO();
     RendererData* bd = GetBackendData();
 
     ImGuiNative.ImFontAtlas_AddFontDefault(io.Fonts.NativePtr, null);
@@ -247,8 +249,8 @@ public unsafe static class ImguiImplOpenGL3 {
     io.Fonts.GetTexDataAsRGBA32(out byte* pixels, out int width, out int height);
 
     int last_texture = GL.GetInteger(GetPName.TextureBinding2d);
-    bd->FontTexture = GL.GenTexture();
-    GL.BindTexture(TextureTarget.Texture2d, bd->FontTexture);
+    bd->fontTexture = GL.GenTexture();
+    GL.BindTexture(TextureTarget.Texture2d, bd->fontTexture);
     GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
     GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
     GL.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
@@ -256,22 +258,22 @@ public unsafe static class ImguiImplOpenGL3 {
     GL.PixelStorei(PixelStoreParameter.UnpackRowLength, 0);
     GL.TexImage2D(TextureTarget.Texture2d, 0, InternalFormat.Rgba, width, height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, (IntPtr)pixels);
 
-    io.Fonts.SetTexID(bd->FontTexture);
+    io.Fonts.SetTexID(bd->fontTexture);
 
     GL.BindTexture(TextureTarget.Texture2d, last_texture);
 
-    if (bd->KHRDebugAvailable)
-      GL.ObjectLabel(ObjectIdentifier.Texture, (uint)bd->FontTexture, -1, "OpenTK_ImGui: Font Texture");
+    if (bd->kHRDebugAvailable)
+      GL.ObjectLabel(ObjectIdentifier.Texture, (uint)bd->fontTexture, -1, "OpenTK_ImGui: Font Texture");
   }
 
   private static void DestroyFontsTexture() {
-    var io = ImGui.GetIO();
+    ImGuiIOPtr io = ImGui.GetIO();
     RendererData* bd = GetBackendData();
 
-    if (bd->FontTexture != 0) {
-      GL.DeleteTexture(bd->FontTexture);
+    if (bd->fontTexture != 0) {
+      GL.DeleteTexture(bd->fontTexture);
       io.Fonts.SetTexID(0);
-      bd->FontTexture = 0;
+      bd->fontTexture = 0;
     }
   }
 
@@ -284,6 +286,7 @@ public unsafe static class ImguiImplOpenGL3 {
       GL.GetShaderInfoLog(handle, out string log);
       Console.Error.WriteLine(log);
     }
+
     return status == (int)All.True;
   }
 
@@ -296,6 +299,7 @@ public unsafe static class ImguiImplOpenGL3 {
       GL.GetProgramInfoLog(handle, out string log);
       Console.Error.WriteLine(log);
     }
+
     return status == (int)All.True;
   }
 
@@ -425,13 +429,13 @@ public unsafe static class ImguiImplOpenGL3 {
 
     string vertex_shader;
     string fragment_shader;
-    if (bd->GlslVersion < 130) {
+    if (bd->glslVersion < 130) {
       vertex_shader = vertex_shader_glsl_120;
       fragment_shader = fragment_shader_glsl_120;
-    } else if (bd->GlslVersion >= 410) {
+    } else if (bd->glslVersion >= 410) {
       vertex_shader = vertex_shader_glsl_410_core;
       fragment_shader = fragment_shader_glsl_410_core;
-    } else if (bd->GlslVersion == 300) {
+    } else if (bd->glslVersion == 300) {
       vertex_shader = vertex_shader_glsl_300_es;
       fragment_shader = fragment_shader_glsl_300_es;
     } else {
@@ -439,8 +443,8 @@ public unsafe static class ImguiImplOpenGL3 {
       fragment_shader = fragment_shader_glsl_130;
     }
 
-    vertex_shader = vertex_shader.Insert(0, $"#version {bd->GlslVersion}{Environment.NewLine}");
-    fragment_shader = fragment_shader.Insert(0, $"#version {bd->GlslVersion}{Environment.NewLine}");
+    vertex_shader = vertex_shader.Insert(0, $"#version {bd->glslVersion}{Environment.NewLine}");
+    fragment_shader = fragment_shader.Insert(0, $"#version {bd->glslVersion}{Environment.NewLine}");
 
     int vert = GL.CreateShader(ShaderType.VertexShader);
     // FIXME: Version string...
@@ -454,25 +458,25 @@ public unsafe static class ImguiImplOpenGL3 {
     GL.CompileShader(frag);
     CheckShader(frag, "fragment shader");
 
-    bd->ShaderHandle = GL.CreateProgram();
-    GL.AttachShader(bd->ShaderHandle, vert);
-    GL.AttachShader(bd->ShaderHandle, frag);
-    GL.LinkProgram(bd->ShaderHandle);
-    CheckProgram(bd->ShaderHandle, "shader program");
+    bd->shaderHandle = GL.CreateProgram();
+    GL.AttachShader(bd->shaderHandle, vert);
+    GL.AttachShader(bd->shaderHandle, frag);
+    GL.LinkProgram(bd->shaderHandle);
+    CheckProgram(bd->shaderHandle, "shader program");
 
-    GL.DetachShader(bd->ShaderHandle, vert);
-    GL.DetachShader(bd->ShaderHandle, frag);
+    GL.DetachShader(bd->shaderHandle, vert);
+    GL.DetachShader(bd->shaderHandle, frag);
     GL.DeleteShader(vert);
     GL.DeleteShader(frag);
 
-    bd->UniformLocationTex = GL.GetUniformLocation(bd->ShaderHandle, "Texture");
-    bd->UniformLocationProjMtx = GL.GetUniformLocation(bd->ShaderHandle, "ProjMtx");
-    bd->AttribLocationVtxPos = GL.GetAttribLocation(bd->ShaderHandle, "Position");
-    bd->AttribLocationVtxUV = GL.GetAttribLocation(bd->ShaderHandle, "UV");
-    bd->AttribLocationVtxColor = GL.GetAttribLocation(bd->ShaderHandle, "Color");
+    bd->uniformLocationTex = GL.GetUniformLocation(bd->shaderHandle, "Texture");
+    bd->uniformLocationProjMtx = GL.GetUniformLocation(bd->shaderHandle, "ProjMtx");
+    bd->attribLocationVtxPos = GL.GetAttribLocation(bd->shaderHandle, "Position");
+    bd->attribLocationVtxUV = GL.GetAttribLocation(bd->shaderHandle, "UV");
+    bd->attribLocationVtxColor = GL.GetAttribLocation(bd->shaderHandle, "Color");
 
-    bd->VboHandle = GL.GenBuffer();
-    bd->EboHandle = GL.GenBuffer();
+    bd->vboHandle = GL.GenBuffer();
+    bd->eboHandle = GL.GenBuffer();
 
     CreateFontsTexture();
 
@@ -481,29 +485,29 @@ public unsafe static class ImguiImplOpenGL3 {
     GL.BindBuffer(BufferTarget.PixelUnpackBuffer, last_pixel_unpack_buffer);
     GL.BindVertexArray(last_vertex_array);
 
-    if (bd->KHRDebugAvailable) {
-      GL.ObjectLabel(ObjectIdentifier.Buffer, (uint)bd->VboHandle, -1, "OpenTK_ImGui: VBO");
-      GL.ObjectLabel(ObjectIdentifier.Buffer, (uint)bd->EboHandle, -1, "OpenTK_ImGui: EBO");
-      GL.ObjectLabel(ObjectIdentifier.Shader, (uint)bd->ShaderHandle, -1, "OpenTK_ImGui: Shader");
+    if (bd->kHRDebugAvailable) {
+      GL.ObjectLabel(ObjectIdentifier.Buffer, (uint)bd->vboHandle, -1, "OpenTK_ImGui: VBO");
+      GL.ObjectLabel(ObjectIdentifier.Buffer, (uint)bd->eboHandle, -1, "OpenTK_ImGui: EBO");
+      GL.ObjectLabel(ObjectIdentifier.Shader, (uint)bd->shaderHandle, -1, "OpenTK_ImGui: Shader");
     }
   }
 
   private static void DestroyDeviceObjects() {
     RendererData* bd = GetBackendData();
 
-    if (bd->VboHandle != 0) {
-      GL.DeleteBuffer(bd->VboHandle);
-      bd->VboHandle = 0;
+    if (bd->vboHandle != 0) {
+      GL.DeleteBuffer(bd->vboHandle);
+      bd->vboHandle = 0;
     }
 
-    if (bd->EboHandle != 0) {
-      GL.DeleteBuffer(bd->EboHandle);
-      bd->EboHandle = 0;
+    if (bd->eboHandle != 0) {
+      GL.DeleteBuffer(bd->eboHandle);
+      bd->eboHandle = 0;
     }
 
-    if (bd->ShaderHandle != 0) {
-      GL.DeleteProgram(bd->ShaderHandle);
-      bd->ShaderHandle = 0;
+    if (bd->shaderHandle != 0) {
+      GL.DeleteProgram(bd->shaderHandle);
+      bd->shaderHandle = 0;
     }
 
     DestroyFontsTexture();

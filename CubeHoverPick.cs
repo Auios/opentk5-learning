@@ -2,9 +2,9 @@ using OpenTK.Mathematics;
 
 /// <summary>Ray vs cube meshes for object hover.</summary>
 public static class CubeHoverPick {
-  private const float Epsilon = 1e-5f;
+  private const float epsilon = 1e-5f;
 
-  private static readonly Vector3[] CubeVertices = [
+  private static readonly Vector3[] cubeVertices = [
     (-0.5f, -0.5f, -0.5f), (0.5f, -0.5f, -0.5f), (0.5f, 0.5f, -0.5f),
     (0.5f, 0.5f, -0.5f), (-0.5f, 0.5f, -0.5f), (-0.5f, -0.5f, -0.5f),
     (-0.5f, -0.5f, 0.5f), (0.5f, -0.5f, 0.5f), (0.5f, 0.5f, 0.5f),
@@ -36,11 +36,11 @@ public static class CubeHoverPick {
       Matrix4 model = objectModels[o];
       for (int tri = 0; tri < 12; tri++) {
         int b = tri * 3;
-        Vector3 v0 = Vector3.TransformPosition(CubeVertices[b], model);
-        Vector3 v1 = Vector3.TransformPosition(CubeVertices[b + 1], model);
-        Vector3 v2 = Vector3.TransformPosition(CubeVertices[b + 2], model);
+        Vector3 v0 = Vector3.TransformPosition(cubeVertices[b], model);
+        Vector3 v1 = Vector3.TransformPosition(cubeVertices[b + 1], model);
+        Vector3 v2 = Vector3.TransformPosition(cubeVertices[b + 2], model);
 
-        if (RayTriangle(rayOrigin, rayDir, v0, v1, v2, out float t) && t >= Epsilon && t < bestT) {
+        if (RayTriangle(rayOrigin, rayDir, v0, v1, v2, out float t) && t >= epsilon && t < bestT) {
           bestT = t;
           bestObj = o;
         }
@@ -64,7 +64,7 @@ public static class CubeHoverPick {
     Vector3 e2 = v2 - v0;
     Vector3 h = Vector3.Cross(dir, e2);
     float a = Vector3.Dot(e1, h);
-    if (a > -Epsilon && a < Epsilon) {
+    if (a > -epsilon && a < epsilon) {
       t = 0f;
       return false;
     }
@@ -85,6 +85,6 @@ public static class CubeHoverPick {
     }
 
     t = f * Vector3.Dot(e2, q);
-    return t > Epsilon;
+    return t > epsilon;
   }
 }

@@ -12,9 +12,9 @@ public static class Window {
   public static OpenGLContextHandle context = null!;
   public static Vector2i size;
 
-  public static bool CameraResetRequested { get; set; }
+  public static bool cameraResetRequested;
 
-  public static Camera Camera { get; private set; } = null!;
+  public static Camera camera = null!;
 
   private static Vector2 lastMouse = Vector2.Zero;
   private static bool mouseLookInitialized;
@@ -26,35 +26,35 @@ public static class Window {
   public static bool Grabbed => grabbed;
 
   /// <summary>Latest pointer position in client coordinates (updated every <see cref="MouseMoveEventArgs"/>).</summary>
-  public static Vector2 ClientPointer { get; private set; }
+  public static Vector2 clientPointer;
 
-  public static Vector3 Move = Vector3.Zero;
+  public static Vector3 move = Vector3.Zero;
 
-  private static readonly HashSet<Scancode> movementKeysHeld = new();
+  private static readonly HashSet<Scancode> movementKeysHeld = [];
 
   /// <summary>Key events for ImGui (<see cref="ImGuiIOPtr.AddKeyEvent"/>), drained each frame by <see cref="ImGuiApp.NewFrame"/>.</summary>
-  public static readonly List<(ImGuiKey key, bool down)> ImGuiKeyEvents = new();
+  public static readonly List<(ImGuiKey key, bool down)> imGuiKeyEvents = [];
 
-  public static bool MouseLeft;
-  public static bool MouseRight;
-  public static bool MouseMiddle;
-  public static Vector2 ScrollAccum = Vector2.Zero;
+  public static bool mouseLeft;
+  public static bool mouseRight;
+  public static bool mouseMiddle;
+  public static Vector2 scrollAccum = Vector2.Zero;
 
   /// <summary>
-  /// Rebuilds <see cref="Move"/> from keys currently held. Using accumulation + KeyUp deltas gets out of sync
-  /// if <see cref="Move"/> is cleared while keys stay down (e.g. camera reset).
+  /// Rebuilds <see cref="move"/> from keys currently held. Using accumulation + KeyUp deltas gets out of sync
+  /// if <see cref="move"/> is cleared while keys stay down (e.g. camera reset).
   /// </summary>
   private static void RebuildMoveVector() {
-    Move.X = 0f;
-    Move.Z = 0f;
+    move.X = 0f;
+    move.Z = 0f;
     if (movementKeysHeld.Contains(Scancode.A))
-      Move.X -= 1f;
+      move.X -= 1f;
     if (movementKeysHeld.Contains(Scancode.D))
-      Move.X += 1f;
+      move.X += 1f;
     if (movementKeysHeld.Contains(Scancode.W))
-      Move.Z -= 1f;
+      move.Z -= 1f;
     if (movementKeysHeld.Contains(Scancode.S))
-      Move.Z += 1f;
+      move.Z += 1f;
   }
 
   public static void ResetMouseLook() {
@@ -69,7 +69,7 @@ public static class Window {
     };
     Toolkit.Init(options);
 
-    OpenGLGraphicsApiHints hints = new OpenGLGraphicsApiHints();
+    OpenGLGraphicsApiHints hints = new();
     handle = Toolkit.Window.Create(hints);
     context = Toolkit.OpenGL.CreateFromWindow(handle);
 
@@ -88,7 +88,7 @@ public static class Window {
     size = clientSize;
     GL.Viewport(0, 0, size.X, size.Y);
     float aspect = clientSize.Y > 0 ? (float)clientSize.X / clientSize.Y : 1.33f;
-    Camera = new Camera(aspect);
+    camera = new Camera(aspect);
 
     defaultCursor = Toolkit.Cursor.Create(SystemCursorType.Default);
 
@@ -98,7 +98,10 @@ public static class Window {
 
     GrabMouseLook();
 
-    ClientPointer = new Vector2(size.X * 0.5f, size.Y * 0.5f);
+    clientPointer = new Vector2(size.X * 0.5f, size.Y * 0.5f);
+
+    Toolkit.Window.ProcessEvents(false);
+    Toolkit.Window.FocusWindow(handle);
   }
 
   public static void SetPosition(Vector2i position) {
@@ -138,7 +141,7 @@ public static class Window {
       case KeyDownEventArgs keyDown:
         ImGuiKey? imguiKeyDown = KeyMap.ToImGuiKey(keyDown.Key);
         if (imguiKeyDown.HasValue && !keyDown.IsRepeat)
-          ImGuiKeyEvents.Add((imguiKeyDown.Value, true));
+          imGuiKeyEvents.Add((imguiKeyDown.Value, true));
 
         if (keyDown.IsRepeat)
           break;
@@ -147,7 +150,7 @@ public static class Window {
             ReleaseMouseLook();
             break;
           case Scancode.R:
-            CameraResetRequested = true;
+            cameraResetRequested = true;
             break;
           case Scancode.W:
           case Scancode.S:
@@ -164,7 +167,7 @@ public static class Window {
       case KeyUpEventArgs keyUp:
         ImGuiKey? imguiKeyUp = KeyMap.ToImGuiKey(keyUp.Key);
         if (imguiKeyUp.HasValue)
-          ImGuiKeyEvents.Add((imguiKeyUp.Value, false));
+          imGuiKeyEvents.Add((imguiKeyUp.Value, false));
 
         switch (keyUp.Scancode) {
           case Scancode.LeftAlt:
@@ -183,14 +186,14 @@ public static class Window {
       case MouseButtonDownEventArgs mouseDown:
         switch (mouseDown.Button) {
           case MouseButton.Button1:
-            MouseLeft = true;
+            mouseLeft = true;
             break;
           case MouseButton.Button2:
-            MouseMiddle = true;
+            mouseMiddle = true;
             break;
           case MouseButton.Button3:
-            MouseRight = true;
-            CameraResetRequested = true;
+            mouseRight = true;
+            cameraResetRequested = true;
             break;
         }
         break;
@@ -198,23 +201,23 @@ public static class Window {
       case MouseButtonUpEventArgs mouseUp:
         switch (mouseUp.Button) {
           case MouseButton.Button1:
-            MouseLeft = false;
+            mouseLeft = false;
             break;
           case MouseButton.Button2:
-            MouseMiddle = false;
+            mouseMiddle = false;
             break;
           case MouseButton.Button3:
-            MouseRight = false;
+            mouseRight = false;
             break;
         }
         break;
 
       case ScrollEventArgs scroll:
-        ScrollAccum += scroll.Delta;
+        scrollAccum += scroll.Delta;
         break;
 
       case MouseMoveEventArgs mouseMove:
-        ClientPointer = mouseMove.ClientPosition;
+        clientPointer = mouseMove.ClientPosition;
         if (!mouseLookInitialized) {
           lastMouse = mouseMove.ClientPosition;
           mouseLookInitialized = true;
@@ -222,7 +225,7 @@ public static class Window {
         }
         Vector2 diff = mouseMove.ClientPosition - lastMouse;
         if (grabbed)
-          Camera.Look(diff / 1000f);
+          camera.Look(diff / 1000f);
         lastMouse = mouseMove.ClientPosition;
         break;
 

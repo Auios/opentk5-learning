@@ -19,7 +19,7 @@ public class Camera {
   private float lookSpeed = 2.5f;
 
   /// <summary>Default eye position; cube sits at origin with no translation on the model matrix.</summary>
-  public static Vector3 DefaultEye => new Vector3(0f, 0.5f, 1.5f);
+  public static Vector3 DefaultEye => new(0f, 0.5f, 1.5f);
 
   public Camera(float aspectRatio) {
     this.projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(90f), aspectRatio, this.near, this.far);
