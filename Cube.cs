@@ -1,8 +1,26 @@
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Mathematics;
 
-internal sealed class Cube
-{
+public struct Face {
+  public Vector3[] verticies;
+  public Vector2[] uvCoords;
+}
+
+public class Cube {
+  public Face[] faces;
+
+  public static Face FrontFace() {
+    return new Face {
+      verticies = [
+        (-0.5f, -0.5f, -0.5f), (0.5f, -0.5f, -0.5f),(0.5f,  0.5f, -0.5f),
+        (0.5f,  0.5f, -0.5f), (-0.5f,  0.5f, -0.5f),(-0.5f, -0.5f, -0.5f),
+      ],
+      uvCoords = [
+        (0.0f, 0.0f), (1.0f, 0.0f), (1.0f, 1.0f),
+        (1.0f, 1.0f), (0.0f, 1.0f), (0.0f, 0.0f),
+      ],
+    };
+  }
   public static readonly Vector3[] verticies = [
     (-0.5f, -0.5f, -0.5f), (0.5f, -0.5f, -0.5f),(0.5f,  0.5f, -0.5f),
     (0.5f,  0.5f, -0.5f), (-0.5f,  0.5f, -0.5f),(-0.5f, -0.5f, -0.5f),
@@ -40,13 +58,11 @@ internal sealed class Cube
 
   public int vao;
 
-  public static float[] BuildVertexArray()
-  {
+  public static float[] BuildVertexArray() {
     float[] data = new float[verticies.Length * 5];
 
     int i = 0;
-    for (int d = 0; d < data.Length; d += 5)
-    {
+    for (int d = 0; d < data.Length; d += 5) {
       data[d + 0] = verticies[i].X;
       data[d + 1] = verticies[i].Y;
       data[d + 2] = verticies[i].Z;
@@ -59,8 +75,7 @@ internal sealed class Cube
     return data;
   }
 
-  public void BindVao(int shaderId)
-  {
+  public void BindVao(int shaderId) {
     this.vao = GL.GenVertexArray();
     GL.BindVertexArray(this.vao);
 
